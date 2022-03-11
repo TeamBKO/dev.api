@@ -75,7 +75,7 @@ const deleteOwnAccountRequest = async (req, res, next) => {
 
   const user = await User.query()
     .where("id", req.user.id)
-    .select("id", "email")
+    .select("id", "email", "username")
     .throwIfNotFound()
     .first();
 
@@ -91,14 +91,15 @@ const deleteOwnAccountRequest = async (req, res, next) => {
     expires
   );
 
-  await sendEmail(user.email, "ACCOUNT_DELETION", { code: passCode });
+  await sendEmail(user.email, "ACCOUNT_DELETION", {
+    code: passCode,
+    username: user.username,
+  });
 
   res.status(200).send({ awaitingConfirmation: true });
 };
 
 const deleteOwnAccountConfirm = async (req, res, next) => {
-  console.log(code);
-
   const settings = await Settings.query()
     .select("allow_users_to_delete_account")
     .first();

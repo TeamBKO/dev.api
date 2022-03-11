@@ -4,14 +4,6 @@ const Settings = require("$models/Settings");
 const { param, body } = require("express-validator");
 const { transaction } = require("objection");
 
-const userList = (req, key) => {
-  return Array.isArray(req.body[key])
-    ? req.body[key].length > 1
-      ? req.body[key]
-      : req.body[key][0]
-    : req.body[key];
-};
-
 const updateMediaSharing = async function (req, res, next) {
   const { enable_account_media_sharing } = await Settings.query()
     .select("enable_account_media_sharing")
@@ -21,42 +13,45 @@ const updateMediaSharing = async function (req, res, next) {
     return res.sendStatus(422);
   }
 
-  const result = {};
+  const result = await Media.updateSharing(req);
+  res.status(200).send(result);
 
-  const add = userList(req, "add");
-  const remove = userList(req, "remove");
+  // const result = {};
 
-  const trx = await Media.startTransaction();
+  // const add = userList(req, "add");
+  // const remove = userList(req, "remove");
 
-  try {
-    if (add || (Array.isArray(add) && add.length)) {
-      const added = await Media.relatedQuery("media_shared_users", trx)
-        .for(req.params.id)
-        .relate(add);
-      Object.assign(result, { added });
-    }
+  // const trx = await Media.startTransaction();
 
-    if (remove) {
-      let removed = Media.relatedQuery("media_shared_users", trx)
-        .for(req.params.id)
-        .unrelate();
-      if (Array.isArray(remove) && remove.length) {
-        removed = removed.whereIn("users.id", remove);
-      } else {
-        removed = removed.where("users.id", remove);
-      }
+  // try {
+  //   if (add || (Array.isArray(add) && add.length)) {
+  //     const added = await Media.relatedQuery("media_shared_users", trx)
+  //       .for(req.params.id)
+  //       .relate(add);
+  //     Object.assign(result, { added });
+  //   }
 
-      Object.assign(result, { removed: await removed });
-    }
+  //   if (remove) {
+  //     let removed = Media.relatedQuery("media_shared_users", trx)
+  //       .for(req.params.id)
+  //       .unrelate();
+  //     if (Array.isArray(remove) && remove.length) {
+  //       removed = removed.whereIn("users.id", remove);
+  //     } else {
+  //       removed = removed.where("users.id", remove);
+  //     }
 
-    await trx.commit();
+  //     Object.assign(result, { removed: await removed });
+  //   }
 
-    res.status(200).send(result);
-  } catch (err) {
-    console.log(err);
-    await trx.rollback();
-    next(err);
-  }
+  //   await trx.commit();
+
+  //   res.status(200).send(result);
+  // } catch (err) {
+  //   console.log(err);
+  //   await trx.rollback();
+  //   next(err);
+  // }
 };
 
 module.exports = {

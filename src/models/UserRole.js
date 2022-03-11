@@ -18,7 +18,7 @@ class UserRole extends Model {
   }
 
   static get relationMappings() {
-    const Role = require("$models/Roles");
+    const Role = require("$models/Role");
     const User = require("$models/User");
     return {
       role: {

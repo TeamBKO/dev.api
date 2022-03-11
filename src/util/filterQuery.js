@@ -1,11 +1,33 @@
 "use strict";
-module.exports = function filterQuery(query, filters) {
+module.exports = function filterQuery(query, filters, table) {
   if (filters && Object.keys(filters).length) {
     Object.entries(filters).forEach(([key, val]) => {
-      query =
-        val && Array.isArray(val)
-          ? query.whereIn(key, val)
-          : query.andWhere(key, val);
+      if (/^searchBy/.test(key)) {
+        if (val) {
+          let identifier = key.split("searchBy")[1];
+
+          /** Split PascalCase */
+          const parts = identifier.trim().split(/(?=[A-Z])/);
+
+          if (parts.length > 1) {
+            identifier = identifier.join(".");
+          } else {
+            identifier = parts[0];
+          }
+
+          query = query.andWhere(identifier.toLowerCase(), "like", `${val}%`);
+        }
+      } else if (key === "exclude" && val.length) {
+        query = query.whereNotIn(`${table}.id`, val);
+      } else if (key === "limit") {
+        query = query.limit(parseInt(val, 10));
+      } else {
+        if (Array.isArray(val) && val.length) {
+          query = query.whereIn(key, val);
+        } else {
+          query = query.andWhere(key, val);
+        }
+      }
     });
   }
 

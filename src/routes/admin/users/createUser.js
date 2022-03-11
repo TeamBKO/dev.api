@@ -1,11 +1,13 @@
 "use strict";
 const User = require("$models/User");
+const pick = require("lodash.pick");
 const bcrypt = require("bcrypt");
 const SALT_ROUNDS = 12;
 const sanitize = require("sanitize-html");
 const guard = require("express-jwt-permissions")();
+const filterQuery = require("$util/filterQuery");
 const { body } = require("express-validator");
-const { validate, buildQuery } = require("$util");
+const { validate } = require("$util");
 const { VIEW_ALL_ADMIN, ADD_ALL_USERS } = require("$util/policies");
 
 const validators = validate([
@@ -21,6 +23,12 @@ const validators = validate([
     .escape()
     .trim()
     .customSanitizer((v) => sanitize(v)),
+  body("avatar")
+    .optional()
+    .isString()
+    .escape()
+    .trim()
+    .customSanitizer((v) => sanitize(v)),
   body("active").isBoolean(),
   body("roles.*").optional().isNumeric(),
   body("policies.*").optional().isNumeric(),
@@ -31,74 +39,117 @@ const consoleLog = (req, res, next) => {
   next();
 };
 
-const insertFn = (credentials, roles, policies) => {
-  const data = {
-    "#id": "user",
-    ...credentials,
-  };
+// const insertFn = (credentials, roles, policies) => {
+//   const data = {
+//     "#id": "user",
+//     ...credentials,
+//   };
 
-  if (roles && roles.length) {
-    Object.assign(data, { roles: roles.map((id) => ({ id })) });
-  }
+//   if (roles && roles.length) {
+//     Object.assign(data, { roles: roles.map((id) => ({ id })) });
+//   }
 
-  if (policies && policies.length) {
-    const _policies = policies.map((id) => ({ id }));
-    Object.assign(data, { policies: _policies });
-  }
+//   if (policies && policies.length) {
+//     const _policies = policies.map((id) => ({ id }));
+//     Object.assign(data, { policies: _policies });
+//   }
 
-  return data;
-};
+//   return data;
+// };
+
+// const createUser = async function (req, res, next) {
+//   const filters = req.body.filters;
+
+//   const { email, active, policies, roles } = req.body;
+
+//   const salt = await bcrypt.genSalt(SALT_ROUNDS);
+//   const password = await bcrypt.hash(req.body.password, salt);
+
+//   const creds = {
+//     username: req.body.username,
+//     active,
+//     email,
+//     password,
+//   };
+
+//   const insert = insertFn(creds, roles, policies);
+//   const options = { relate: true, unrelate: true };
+
+//   const { username, users } = await User.transaction(async (trx) => {
+//     const user = await User.query(trx)
+//       .insertGraph(insert, options)
+//       .returning("*");
+
+//     let query = User.query(trx)
+//       .withGraphFetched("[roles(nameAndId), policies]")
+//       .orderBy("id")
+//       .select("id", "avatar", "username", "email", "created_at");
+
+//     // if (filters && Object.keys(filters).length) {
+//     //   console.log(filters);
+
+//     //   query = query.whereExists(
+//     //     User.relatedQuery("roles").whereIn("id", filters.id)
+//     //   );
+//     // }
+
+//     return { username: user.username };
+//   });
+
+//   res.status(200).send({ username, users });
+// };
+
+const columns = [
+  "users.id",
+  "avatar",
+  "username",
+  "email",
+  "active",
+  "created_at",
+  "updated_at",
+];
 
 const createUser = async function (req, res, next) {
-  const filters = req.body.filters;
+  let data = pick(req.body, ["username", "email", "password", "avatar"]),
+    roles = req.body.roles,
+    policies = req.body.policies,
+    filters = req.body.filters;
 
-  const { email, active, policies, roles } = req.body;
+  const trx = await User.startTransaction();
 
-  const salt = await bcrypt.genSalt(SALT_ROUNDS);
-  const password = await bcrypt.hash(req.body.password, salt);
+  try {
+    const salt = await bcrypt.genSalt(SALT_ROUNDS);
+    data.password = await bcrypt.hash(data.password, salt);
 
-  const creds = {
-    username: req.body.username,
-    active,
-    email,
-    password,
-  };
+    const { id } = await User.createUser(data, roles, policies, trx);
 
-  const insert = insertFn(creds, roles, policies);
-  const options = { relate: true, unrelate: true };
+    await trx.commit();
 
-  const { username, users } = await User.transaction(async (trx) => {
-    const user = await User.query(trx)
-      .insertGraph(insert, options)
-      .returning("*");
+    const user = await filterQuery(
+      User.query()
+        .withGraphJoined("roles(nameAndId)")
+        .where("users.id", id)
+        .select(columns)
+        .first(),
+      filters
+    );
 
-    let query = User.query(trx)
-      .withGraphFetched("[roles(nameAndId), policies]")
-      .orderBy("id")
-      .select("id", "avatar", "username", "email", "created_at");
+    console.log("user", user);
 
-    if (filters && Object.keys(filters).length) {
-      console.log(filters);
-
-      query = query.whereExists(
-        User.relatedQuery("roles").whereIn("id", filters.id)
-      );
-    }
-
-    const users = await buildQuery(query, page, limit);
-
-    return { username: user.username, users };
-  });
-
-  res.status(200).send({ username, users });
+    res.status(200).send(user);
+  } catch (err) {
+    console.log(err);
+    await trx.rollback();
+    next(err);
+  }
 };
 
 module.exports = {
   path: "/",
   method: "POST",
   middleware: [
+    // consoleLog,
     guard.check([VIEW_ALL_ADMIN, ADD_ALL_USERS]),
-    consoleLog,
     validators,
   ],
   handler: createUser,

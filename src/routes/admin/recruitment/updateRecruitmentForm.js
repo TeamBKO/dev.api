@@ -10,7 +10,7 @@ const { transaction } = require("objection");
 
 const validators = validate([
   param("id").isNumeric().toInt(10),
-  body("details.status").isIn(["pending", "accepted", "rejected"]),
+  body("status").isIn(["pending", "accepted", "rejected"]),
 ]);
 
 const select = [
@@ -26,10 +26,10 @@ const select = [
 const updateRecruitmentForm = async (req, res, next) => {
   const trx = await UserForm.startTransaction();
 
+  console.log(req.body);
+
   try {
-    await UserForm.query(trx)
-      .patch(req.body.details)
-      .where("id", req.params.id);
+    await UserForm.query(trx).patch(req.body).where("id", req.params.id);
 
     const form = await UserForm.query()
       .joinRelated("form.[category]")
@@ -38,7 +38,7 @@ const updateRecruitmentForm = async (req, res, next) => {
       .select(select)
       .first();
 
-    if (req.body.details.status === "accepted") {
+    if (req.body.status === "accepted") {
       /** PATCH GUEST(id: 3) TO MEMBER (id: 2) */
       await UserRole.query(trx)
         .patch({ role_id: 2 })
@@ -46,10 +46,17 @@ const updateRecruitmentForm = async (req, res, next) => {
         .where("role_id", 3);
     }
 
-    await redis.del(`r_form_${form.category.id}`);
+    await trx.commit();
+
+    console.log(form);
+
+    await redis.del(`r_form_${form.category_id}`);
 
     res.status(200).send(form);
+
+    // res.sendStatus(204);
   } catch (err) {
+    await trx.rollback();
     console.log(err);
     next(err);
   }
@@ -58,6 +65,13 @@ const updateRecruitmentForm = async (req, res, next) => {
 module.exports = {
   path: "/:id",
   method: "PATCH",
-  middleware: [guard.check([VIEW_ALL_ADMIN, UPDATE_ALL_FORMS]), validators],
+  middleware: [
+    (req, res, next) => {
+      console.log(req.body);
+      next();
+    },
+    guard.check([VIEW_ALL_ADMIN, UPDATE_ALL_FORMS]),
+    validators,
+  ],
   handler: updateRecruitmentForm,
 };

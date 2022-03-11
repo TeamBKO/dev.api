@@ -15,6 +15,16 @@ const getDashboardData = async (req, res, next) => {
     .groupBy("day")
     .orderBy("day");
 
+  const verified = await User.query()
+    .select(
+      raw(
+        "active, count(*) as verified, count(*) * 100.0 / sum(count(*)) over () as total"
+      )
+    )
+    .groupBy("active");
+
+  console.log("verified", verified);
+
   const discord = {
     status: !!client.readyAt,
     readyAt: client.readyAt,
@@ -22,7 +32,7 @@ const getDashboardData = async (req, res, next) => {
 
   console.log(discord);
 
-  res.status(200).send({ chart, discord });
+  res.status(200).send({ chart, verified, discord });
 };
 
 module.exports = {

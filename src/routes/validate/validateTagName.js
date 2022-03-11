@@ -16,7 +16,6 @@ module.exports = {
   path: "/tags",
   method: "GET",
   middleware: [
-    guard.check([VIEW_ALL_ADMIN]),
     validate([
       query("value")
         .notEmpty()

@@ -9,15 +9,27 @@ const { VIEW_ALL_ADMIN, VIEW_ALL_FORMS } = require("$util/policies");
 const validators = validate([param("id").isNumeric().toInt(10)]);
 
 const getSingleForm = async function (req, res, next) {
+  // const form = await getCache(
+  //   `form_${req.params.id}`,
+  //   Form.query()
+  //     .withGraphFetched("[category(defaultSelects), fields(order)]")
+  //     .select("id", "name", "description", "category_id")
+  //     .where("id", req.params.id)
+  //     .first()
+  //     .throwIfNotFound()
+  // );
+
   const form = await getCache(
     `form_${req.params.id}`,
     Form.query()
-      .withGraphFetched("[category(defaultSelects), fields(order)]")
-      .select("id", "name", "description", "category_id")
+      .withGraphFetched("[fields(order)]")
+      .select("id", "name", "description")
       .where("id", req.params.id)
       .first()
       .throwIfNotFound()
   );
+
+  console.log(form);
 
   res.status(200).send(form);
 };

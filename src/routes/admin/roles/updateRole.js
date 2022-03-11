@@ -1,12 +1,12 @@
 "use strict";
-const Roles = require("$models/Roles");
+const Role = require("$models/Role");
 const guard = require("express-jwt-permissions")();
 const sanitize = require("sanitize-html");
 const redis = require("$services/redis");
 const getUserSessionsByRoleID = require("$util/getUserSessionsByRoleID");
 
 const { param, body } = require("express-validator");
-const { validate } = require("$util");
+const { validate, shouldRevokeToken } = require("$util");
 const { VIEW_ALL_ADMIN, UPDATE_ALL_ROLES } = require("$util/policies");
 const { transaction, raw } = require("objection");
 
@@ -47,35 +47,37 @@ const select = [
 ];
 
 const updateRole = async (req, res, next) => {
-  const altered = req.body.altered;
-
-  console.log(req.body);
-
-  const trx = await Roles.startTransaction();
+  let query = Role.query();
+  const trx = await Role.startTransaction();
 
   try {
-    await Roles.updateRole(req.params.id, req.body, trx);
+    await Role.updateRole(req.params.id, req.body, trx);
     await redis.del(`role_${req.params.id}`);
     await trx.commit();
+
+    if (shouldRevokeToken(req)) {
+      console.log("Revoke");
+      const sessions = await getUserSessionsByRoleID(req.params.id);
+      if (sessions && sessions.length) {
+        console.log(sessions);
+        await redis.multi(sessions).exec();
+      }
+      query = query.withGraphFetched("[policies, discord_roles]");
+    }
+
+    const role = await query
+      .where("id", req.params.id)
+      .select([...Object.keys(req.body.details), "id", "updated_at"])
+      .first();
+
+    console.log(role);
+
+    res.status(200).send(role);
   } catch (err) {
     console.log(err);
     await trx.rollback();
     return next(err);
   }
-
-  if (altered) {
-    const sessions = await getUserSessionsByRoleID(req.params.id);
-    console.log(sessions);
-    if (sessions && sessions.length) await redis.multi(sessions).exec();
-  }
-
-  const role = await Roles.query()
-    .where("id", req.params.id)
-    .select(select)
-    .withGraphFetched("[policies, discord_roles]")
-    .first();
-
-  res.status(200).send(role);
 };
 
 module.exports = {

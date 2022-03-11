@@ -16,10 +16,9 @@ module.exports = async function getUserBlacklistByRoleID(id, trx) {
     : UserSession.query().joinRelated("user.roles");
   query =
     Array.isArray(id) && id.length
-      ? query
-          .whereIn("user:roles.id", id)
-          .groupBy("user_sessions.refresh_token_id")
-      : query.where("user:roles.id", id);
+      ? query.whereIn("user:roles.id", id)
+      : // .groupBy("user_sessions.refresh_token_id")
+        query.where("user:roles.id", id);
   const userSessions = await query
     .whereRaw(raw("expires >= CURRENT_TIMESTAMP"))
     .select("user_sessions.refresh_token_id", "expires")
@@ -37,6 +36,8 @@ module.exports = async function getUserBlacklistByRoleID(id, trx) {
       return output;
     }, []);
   }
+
+  console.log(blacklist);
 
   return blacklist;
 };

@@ -61,11 +61,14 @@ const updateUsername = async (req, res, next) => {
         last_username_change: new Date().toISOString(),
       })
       .where("id", req.user.id)
+      .first()
       .returning(["id", "username"]);
 
     await trx.commit();
     await redis.del(`me_${req.user.id}`);
     await redis.del(`user_${req.user.id}`);
+
+    console.log(user);
 
     res.status(200).send(user);
   } catch (err) {

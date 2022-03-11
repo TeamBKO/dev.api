@@ -44,29 +44,29 @@ const addForm = async function (req, res, next) {
 
   const options = { relate: true };
 
-  try {
-    const userAlreadySubmitted = await UserForm.query()
-      .joinRelated("[applicant, form]")
-      .where("applicant.id", req.user.id)
-      .andWhere("form.category_id", req.body.category_id)
-      .andWhere("user_forms.status", "pending")
-      .first();
+  const userAlreadySubmitted = await UserForm.query()
+    .joinRelated("[applicant, form.[roster]]")
+    .where("applicant.id", req.user.id)
+    .andWhere("form:roster.id", req.body.roster_id)
+    .andWhere("user_forms.status", "pending")
+    .first();
 
-    if (userAlreadySubmitted) {
-      const message =
-        "You've already submitted an application for this category. Please wait for review and a response";
-      return res.status(422).send({
-        message,
-      });
-    }
-
-    await UserForm.transaction(async (trx) => {
-      await UserForm.query(trx).insertGraph(insert, options).returning("*");
+  if (userAlreadySubmitted) {
+    const message =
+      "You've already submitted an application for this category. Please wait for review and a response";
+    return res.status(422).send({
+      message,
     });
+  }
 
+  const trx = await UserForm.startTransaction();
+
+  try {
+    await UserForm.query(trx).insertGraph(insert, options);
+    await trx.commit();
     res.sendStatus(204);
   } catch (err) {
-    console.log(err);
+    await trx.rollback();
     next(err);
   }
 };

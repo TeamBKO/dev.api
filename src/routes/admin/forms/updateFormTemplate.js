@@ -54,21 +54,11 @@ const consoleRequest = (req, res, next) => {
   next();
 };
 
-const upsert = (id, details, added, update) => {
-  let result = { id, updated_at: new Date().toISOString() };
-  let fields = [];
+const upsert = (id, details, fields) => {
+  let result = { id };
 
   if (details && Object.keys(details).length) {
-    if (details.category_id) details.status = false;
     Object.assign(result, details);
-  }
-
-  if (added && added.length) {
-    fields = fields.concat(added);
-  }
-
-  if (update && update.length) {
-    fields = fields.concat(update);
   }
 
   if (fields && fields.length) {
@@ -90,43 +80,57 @@ const upsert = (id, details, added, update) => {
 };
 
 const updateForm = async function (req, res, next) {
-  const { details, added, update, remove } = req.body;
+  const { details, fields } = req.body;
 
-  const up = upsert(req.params.id, details, added, update);
+  const up = upsert(req.params.id, details, fields);
+  const trx = await Form.startTransaction();
 
-  const form = await Form.transaction(async (trx) => {
-    let result = await Form.query(trx)
-      .upsertGraph(up, {
-        noDelete: true,
-      })
-      .first()
-      .returning("*");
+  try {
+    const { id } = await Form.query(trx).upsertGraph(up);
 
-    if (remove && remove.length) {
-      await Field.query(trx).whereIn("id", remove).del().returning("*");
-      if (!details && !added && !update) {
-        result = await Form.query(trx)
-          .patch({
-            updated_at: new Date().toISOString(),
-          })
-          .returning("*");
-      }
-    }
+    await redis.del(`form_${id}`);
 
-    await redis.del(`form_${req.params.id}`);
+    await trx.commit();
 
-    // return pick(result, [
-    //   "name",
-    //   "status",
-    //   "category",
-    //   "created_at",
-    //   "updated_at",
-    // ]);
+    const form = await Form.query()
+      .where("id", id)
+      .select(uniq(["name", ...Object.keys(details)]))
+      .first();
 
-    return result;
-  });
+    res.status(200).send(form);
+  } catch (err) {
+    console.log(err);
+    next(err);
+  }
 
-  res.status(200).send({ form });
+  // const form = await Form.transaction(async (trx) => {
+  //   let result = await Form.query(trx).upsertGraph(up).first().returning("*");
+
+  //   if (remove && remove.length) {
+  //     await Field.query(trx).whereIn("id", remove).del().returning("*");
+  //     if (!details && !added && !update) {
+  //       result = await Form.query(trx)
+  //         .patch({
+  //           updated_at: new Date().toISOString(),
+  //         })
+  //         .returning("*");
+  //     }
+  //   }
+
+  //   await redis.del(`form_${req.params.id}`);
+
+  //   // return pick(result, [
+  //   //   "name",
+  //   //   "status",
+  //   //   "category",
+  //   //   "created_at",
+  //   //   "updated_at",
+  //   // ]);
+
+  //   return result;
+  // });
+
+  res.status(200).send(form);
 };
 
 module.exports = {

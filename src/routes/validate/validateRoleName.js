@@ -1,11 +1,11 @@
 "use strict";
-const Roles = require("$models/Roles");
+const Role = require("$models/Role");
 const guard = require("express-jwt-permissions")();
 const { query } = require("express-validator");
 const { validate } = require("$util");
 
 const validateRoleName = async function (req, res, next) {
-  const role = await Roles.query()
+  const role = await Role.query()
     .where("name", req.query.value)
     .select("id")
     .first();
@@ -17,11 +17,11 @@ module.exports = {
   path: "/role",
   method: "GET",
   middleware: [
-    guard.check(["view:roles", "update:roles"]),
     validate(
       [
         query("value")
           .notEmpty()
+          .withMessage("Name is required.")
           .isAlphanumeric()
           .withMessage("Name must be alphanumeric.")
           .isLength({ min: 3, max: 30 })

@@ -15,7 +15,7 @@ const getSideMenuUserList = async function (req, res) {
   const userQuery = filterQuery(
     User.query()
       .orderBy("username")
-      .orderBy("id", "asc")
+      .orderBy("id", "desc")
       .select(columns)
       .limit(50),
     filters

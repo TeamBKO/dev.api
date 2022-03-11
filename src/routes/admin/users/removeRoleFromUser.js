@@ -22,7 +22,9 @@ const removeUserRole = async function (req, res, next) {
       .throwIfNotFound();
 
     const sessions = await getUserSessions(userId);
-    if (sessions) await redis.multi(sessions).exec();
+    if (sessions) {
+      await redis.multi(sessions).exec();
+    }
     await trx.commit();
     await redis.del(`user_${userId}`);
     await redis.del(`me_${userId}`);

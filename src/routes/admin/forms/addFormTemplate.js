@@ -9,13 +9,13 @@ const { VIEW_ALL_ADMIN, ADD_ALL_FORMS } = require("$util/policies");
 const { transaction } = require("objection");
 
 const validators = validate([
-  body("form.category_id").isNumeric(),
-  body("form.name")
+  body("details.name")
     .isString()
     .trim()
     .escape()
     .customSanitizer((v) => sanitize(v)),
-  body("form.description")
+  body("details.description")
+    .optional()
     .isString()
     .trim()
     .escape()
@@ -28,18 +28,18 @@ const validators = validate([
     .trim()
     .escape()
     .customSanitizer((v) => sanitize(v)),
-  body("nextCursor").optional().isString().escape().trim(),
+
   // body("page").optional().isNumeric(),
   // body("limit").optional().isNumeric(),
   // body("orderBy").optional().isString().trim().escape(),
   // body("sortBy").optional().isString().trim().escape(),
 ]);
 
-const insertFn = (id, form, fields) => {
+const insertFn = (id, details, fields) => {
   const result = { creator_id: id };
 
-  if (form && Object.keys(form).length) {
-    Object.assign(result, { "#id": "form" }, form);
+  if (details && Object.keys(details).length) {
+    Object.assign(result, details);
   }
 
   if (fields && fields.length) {
@@ -60,42 +60,31 @@ const insertFn = (id, form, fields) => {
 const select = [
   "forms.id",
   "forms.name",
-  "forms.status",
   "forms.is_deletable",
-  "forms.category_id",
-  "created_by.username as creator",
   "forms.created_at",
   "forms.updated_at",
 ];
 
 const addForm = async function (req, res, next) {
-  const { form, fields, filters, nextCursor } = req.body;
+  const { details, fields } = req.body;
 
-  const insert = insertFn(req.user.id, form, fields);
+  const insert = insertFn(req.user.id, details, fields);
 
   const trx = await Form.startTransaction();
 
   try {
-    await Form.query(trx).insertGraph(insert);
-
-    // const query = Form.query()
-    //   .orderBy("id")
-    //   .orderBy("created_at", "desc")
-    //   .where("creator_id", req.user.id);
-
-    const query = Form.query()
-      .joinRelated("created_by(onlyUsername)")
-      .select(select)
-      .orderBy("id");
-
-    const forms = await query.clone().cursorPage(nextCursor);
-
-    // const forms = await query.clone().cursorPage();
+    const { id } = await Form.query(trx).insertGraph(insert);
 
     await trx.commit();
 
-    console.log(forms);
-    res.status(200).send(forms);
+    const form = await Form.query()
+      .withGraphFetched("created_by(defaultSelects)")
+      .select(select)
+      .where("forms.id", id)
+      .first();
+
+    console.log(form);
+    res.status(200).send(form);
   } catch (err) {
     console.log(err);
     await trx.rollback();

@@ -166,7 +166,7 @@ const generateUsers = async (num) => {
 exports.seed = async function (knex) {
   // Deletes ALL existing entries
   try {
-    const users = await generateUsers(75);
+    const users = await generateUsers(300);
     await knex.raw("TRUNCATE users, media RESTART IDENTITY CASCADE");
 
     const results = await User.query(knex)

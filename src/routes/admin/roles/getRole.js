@@ -1,13 +1,13 @@
 "use strict";
-const Roles = require("$models/Roles");
+const Role = require("$models/Role");
 const DiscordRole = require("$models/DiscordRole");
-const Policies = require("$models/Policies");
+const Policy = require("$models/Policy");
 const Settings = require("$models/Settings");
 const getCache = require("$util/getCache");
 
 const guard = require("express-jwt-permissions")();
 const { param } = require("express-validator");
-const { validate, getDiscordRoles } = require("$util");
+const { validate } = require("$util");
 const {
   VIEW_ALL_ADMIN,
   VIEW_ALL_ROLES,
@@ -35,37 +35,34 @@ const select = [
 ];
 
 const getRole = async function (req, res) {
-  const settings = await Settings.query()
-    .select(["enable_bot", "bot_server_id"])
-    .first();
+  // const settings = await Settings.query()
+  //   .select(["enable_bot", "bot_server_id"])
+  //   .first();
 
-  let discord = null;
+  // if (settings.enable_bot && settings.bot_server_id) {
+  //   const discord = await getCache("discord", DiscordRole.query());
+  //   Object.assign(response, { discord });
+  // }
 
-  if (settings.enable_bot && settings.bot_server_id) {
-    discord = await getCache("discord", DiscordRole.query());
-  }
+  const role = await getCache(
+    `role_${req.params.id}`,
+    Role.query()
+      .where("id", req.params.id)
+      .select(select)
+      .withGraphFetched("[policies, discord_roles]")
+      .first()
+      .throwIfNotFound()
+  );
 
-  const roleQuery = Roles.query()
-    .where("id", req.params.id)
-    .select(select)
-    .withGraphFetched("[policies, discord_roles]")
-    .first()
-    .throwIfNotFound();
+  // let [role, selectable] = await Promise.all([
+  //   getCache(`role_${req.params.id}`, roleQuery),
+  //   getCache("policies", Policy.query()),
+  //   // Policies.query().where("level", ">=", req.user.level),
+  // ]);
 
-  // const cached = await getCached("policies", Policies.query());
+  // selectable = selectable.filter(({ level }) => level >= req.user.level);
 
-  // const policies = cached.filter(({ level }) => level === req.user.level);
-
-  const [role, selectable] = await Promise.all([
-    getCache(`role_${req.params.id}`, roleQuery),
-    Policies.query().where("level", ">=", req.user.level),
-  ]);
-
-  res.status(200).send({
-    role,
-    selectable,
-    discord,
-  });
+  res.status(200).send(role);
 };
 
 module.exports = {

@@ -38,22 +38,6 @@ const columns = [
   "updated_at",
 ];
 
-const graphFn = (id, details, roles, policies) => {
-  const data = { id };
-  if (details && Object.keys(details)) {
-    Object.assign(data, details);
-  }
-  if (roles && roles.length) {
-    Object.assign(data, { roles: roles.map((id) => ({ id })) });
-  }
-  if (policies && policies.length) {
-    Object.assign(data, {
-      policies: policies.map((id) => ({ id })),
-    });
-  }
-  return data;
-};
-
 const updateUser = async (req, res, next) => {
   const trx = await User.startTransaction();
 
@@ -62,7 +46,7 @@ const updateUser = async (req, res, next) => {
 
     if (shouldRevokeToken(req)) {
       const sessions = await getUserSessions(req.params.id);
-      if (sessions) await redis.multi(commands).exec();
+      if (sessions && sessions.length) await redis.multi(sessions).exec();
       emitter
         .of("/index")
         .to(`user:${req.params.id}`)

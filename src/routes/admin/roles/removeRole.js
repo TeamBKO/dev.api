@@ -1,5 +1,5 @@
 "use strict";
-const Roles = require("$models/Roles");
+const Role = require("$models/Role");
 const guard = require("express-jwt-permissions")();
 
 const redis = require("$services/redis");
@@ -15,34 +15,38 @@ const middleware = [
 ];
 
 const removeRole = async function (req, res, next) {
-  const trx = await Roles.startTransaction();
+  const trx = await Role.startTransaction();
 
-  let deleted = 0;
+  let deleted;
 
   try {
-    deleted = await Roles.query(trx)
+    deleted = await Role.query(trx)
       .whereIn("id", req.query.ids)
-      .where("is_deletable", true)
-      .returning("ids")
+      .andWhere("is_deletable", true)
+      .throwIfNotFound()
+      .returning("id")
       .delete();
 
+    if (deleted) {
+      console.log("deleted", deleted);
+      const pipeline = redis.pipeline();
+      req.query.ids.forEach((id) => pipeline.del(`role_${id}`));
+
+      const sessions = await getUserSessionsByRoleID(req.query.ids);
+      if (sessions && sessions.length) await redis.multi(sessions).exec();
+
+      pipeline.exec();
+      await redis.del("roles");
+    }
+
     await trx.commit();
+
+    res.status(200).send(deleted);
   } catch (err) {
     console.log(err);
     await trx.rollback();
     return next(err);
   }
-
-  if (deleted) {
-    const pipeline = redis.pipeline();
-    req.query.ids.forEach((id) => pipeline.del(`role_${id}`));
-    const sessions = await getUserSessionsByRoleID(req.query.ids);
-    if (sessions && sessions.length) await redis.multi(sessions).exec();
-    pipeline.exec();
-    await redis.del("roles");
-  }
-
-  res.status(200).send(deleted);
 };
 
 module.exports = {

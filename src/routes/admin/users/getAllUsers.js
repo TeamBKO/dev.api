@@ -1,12 +1,11 @@
 "use strict";
 const User = require("$models/User");
-const Roles = require("$models/Roles");
-const Policies = require("$models/Policies");
 const filterQuery = require("$util/filterQuery");
 const guard = require("express-jwt-permissions")();
 const { query } = require("express-validator");
 const { validate } = require("$util");
 const { VIEW_ALL_ADMIN, VIEW_ALL_USERS } = require("$util/policies");
+const pick = require("lodash.pick");
 
 const columns = [
   "users.id",
@@ -19,41 +18,43 @@ const columns = [
 ];
 
 const getAllUsers = async function (req, res, next) {
-  const filters = req.query.filters || null,
-    nextCursor = req.query.nextCursor,
-    isInitial = req.query.isInitial;
+  const nextCursor = req.query.nextCursor;
+  const filters = pick(req.query, [
+    "limit",
+    "exclude",
+    "searchByUsername",
+    "active",
+  ]);
+
+  const roleIds = req.query["roles.id"];
 
   const userQuery = filterQuery(
     User.query()
-      .withGraphJoined("roles(nameAndId)")
-      .orderBy("users.id")
+      .withGraphFetched("roles(nameAndId)")
+      .orderBy("users.created_at", "desc")
       .select(columns)
       .limit(50),
-    filters
+    filters,
+    "users" //column to look up what records to exclude
   );
 
-  let response = {};
-  let query;
-
-  if (isInitial) {
-    const policyQuery = Policies.query().where("level", ">=", req.user.level);
-    const roleQuery = Roles.query()
-      .select("id", "name")
-      .where("level", ">=", req.user.level);
-
-    const [policies, roles] = await Promise.all([policyQuery, roleQuery]);
-
-    Object.assign(response, { policies, roles });
+  if (roleIds && roleIds.length) {
+    userQuery = userQuery.whereExists(
+      User.relatedQuery("roles").whereIn("id", roleIds)
+    );
   }
 
-  if (nextCursor) query = await userQuery.clone().cursorPage(nextCursor);
-  else query = await userQuery.clone().cursorPage();
+  let query;
 
-  console.log(query);
+  if (nextCursor) {
+    query = await userQuery.clone().cursorPage(nextCursor).debug();
+  } else {
+    query = await userQuery.clone().cursorPage().debug();
+  }
 
-  Object.assign(response, { users: query });
+  console.log(query.results.length);
 
-  res.status(200).send(response);
+  res.status(200).send(query);
 };
 
 module.exports = {
@@ -63,7 +64,7 @@ module.exports = {
     guard.check([VIEW_ALL_ADMIN, VIEW_ALL_USERS]),
     validate([
       query("nextCursor").optional().isString().escape().trim(),
-      query("isInitial").isBoolean().default(false),
+      // query("isInitial").optional().isBoolean().default(false),
       query("limit").optional().isNumeric(),
     ]),
   ],

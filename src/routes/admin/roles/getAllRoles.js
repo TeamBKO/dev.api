@@ -1,13 +1,15 @@
 "use strict";
-const Roles = require("$models/Roles");
-const DiscordRoles = require("$models/DiscordRole");
+const Role = require("$models/Role");
+const DiscordRole = require("$models/DiscordRole");
 const Settings = require("$models/Settings");
-const Policies = require("$models/Policies");
+const Policy = require("$models/Policy");
 const guard = require("express-jwt-permissions")();
 const getCache = require("$util/getCache");
+const filterQuery = require("$util/filterQuery");
 const { query } = require("express-validator");
 const { validate } = require("$util");
 const { VIEW_ALL_ADMIN, VIEW_ALL_ROLES } = require("$util/policies");
+const pick = require("lodash.pick");
 
 const select = [
   "id",
@@ -21,45 +23,34 @@ const select = [
 
 const getAllRoles = async function (req, res, next) {
   const nextCursor = req.query.nextCursor;
-  const isInitial = req.query.isInitial;
+  const filters = pick(req.query, ["limit", "exclude", "id"]);
 
-  const settings = await Settings.query().select("enable_bot").first();
-
-  const roleQuery = Roles.query()
-    .select(
-      select,
-      Roles.relatedQuery("users")
-        .count("users.id")
-        .as("members")
-        .whereColumn("roles.id", "user_roles.role_id")
-    )
-    .orderBy("id", "ASC")
-    .where("level", ">=", req.user.level)
-    .limit(req.query.limit || 50);
+  const roleQuery = filterQuery(
+    Role.query()
+      .select(
+        select,
+        Role.relatedQuery("users")
+          .count("users.id")
+          .as("members")
+          .whereColumn("roles.id", "user_roles.role_id")
+      )
+      .orderBy("created_at", "desc")
+      .orderBy("id"),
+    filters,
+    "roles" //column to lookup exclusion
+  );
 
   let query = null;
-  let response = {};
 
-  /**Grab policies on the first page request per client */
-  if (isInitial) {
-    const cached = await getCache("policies", Policies.query());
-    const policies = cached.filter(({ level }) => level >= req.user.level);
-
-    if (settings.enable_bot) {
-      Object.assign(response, {
-        discord: await getCache("discord", DiscordRoles.query()),
-      });
-    }
-
-    Object.assign(response, { policies });
+  if (nextCursor) {
+    query = await roleQuery.clone().cursorPage(nextCursor);
+  } else {
+    query = await roleQuery.clone().cursorPage();
   }
 
-  if (nextCursor) query = await roleQuery.clone().cursorPage(nextCursor);
-  else query = await roleQuery.clone().cursorPage();
+  // Object.assign(response, { roles: query });
 
-  Object.assign(response, { roles: query });
-
-  res.status(200).send(response);
+  res.status(200).send(query);
 };
 
 module.exports = {
@@ -67,11 +58,7 @@ module.exports = {
   method: "GET",
   middleware: [
     guard.check([VIEW_ALL_ADMIN, VIEW_ALL_ROLES]),
-    validate([
-      query("nextCursor").optional().isString().escape().trim(),
-      query("isInitial").isBoolean(),
-      query("limit").optional().isNumeric().toInt(10).default(25),
-    ]),
+    validate([query("nextCursor").optional().isString().escape().trim()]),
   ],
   handler: getAllRoles,
 };

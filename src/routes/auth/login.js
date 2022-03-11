@@ -4,7 +4,7 @@ const bcrypt = require("bcrypt");
 const User = require("$models/User");
 const UserSession = require("$models/UserSession");
 const Settings = require("$models/Settings");
-const Policies = require("$models/Policies");
+const Policy = require("$models/Policy");
 const verifyRecaptcha = require("$services/recaptcha")(
   process.env.RECAPTCHA_SECRET
 );
@@ -56,7 +56,7 @@ const login = async function (req, res, next) {
   }
 
   if (!enable_user_authentication) {
-    const policy = await Policies.query()
+    const policy = await Policy.query()
       .where({ action: "view", target: "all", resource: "admin" })
       .select("id")
       .first();

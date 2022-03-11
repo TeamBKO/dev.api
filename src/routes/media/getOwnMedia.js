@@ -18,7 +18,7 @@ const select = [
 ];
 
 const getOwnMedia = async function (req, res, next) {
-  const nextCursor = req.query.next;
+  const nextCursor = req.query.nextCursor;
 
   const { enable_account_media_sharing } = await Settings.query()
     .select("enable_account_media_sharing")
@@ -40,12 +40,6 @@ const getOwnMedia = async function (req, res, next) {
 
   if (nextCursor) media = await query.clone().cursorPage(nextCursor);
   else media = await query.clone().cursorPage();
-
-  // const media = await buildQuery(
-  //   Media.query().where("owner_id", req.user.id),
-  //   req.query.start,
-  //   req.query.limit
-  // );
 
   console.log(media);
 

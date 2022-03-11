@@ -42,7 +42,7 @@ exports.seed = async function (knex) {
     await knex
       .into("role_policies")
       .insert([
-        ...generateRolePerms(1, 31),
+        ...generateRolePerms(1, allPermissions.length - 1),
         { role_id: 2, policy_id: 4 },
         { role_id: 4, policy_id: 1 },
         { role_id: 4, policy_id: 2 },

@@ -1,7 +1,7 @@
 "use strict";
 const User = require("$models/User");
 const Settings = require("$models/Settings");
-const Roles = require("$models/Roles");
+const Role = require("$models/Role");
 const DiscordClient = require("$services/discord");
 const redis = require("$services/redis");
 const emitter = require("$services/redis/emitter");
@@ -82,7 +82,7 @@ const linkDiscordSocialAccount = async (req, res, next) => {
         dUser.id
       );
 
-      const roles = await Roles.query()
+      const roles = await Role.query()
         .joinRelated("discord_roles")
         .select("roles.id as id")
         .whereIn("discord_role_id", guildMember._roles);

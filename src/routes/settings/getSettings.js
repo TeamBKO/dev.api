@@ -1,5 +1,6 @@
 "use strict";
 const Settings = require("$models/Settings");
+
 const select = [
   "show_video",
   "show_video_on_mobile",
@@ -34,16 +35,9 @@ const getSettings = async (req, res) => {
   //   return output;
   // }, {});
 
-  const _settings = await Settings.query()
-    .where("id", 1)
-    .select(select)
-    .first();
+  const settings = await Settings.query().select(select).first();
 
-  console.log(_settings);
-
-  // console.log(_settings);
-
-  res.status(200).send(_settings);
+  res.status(200).send(settings);
 };
 
 module.exports = {

@@ -1,8 +1,7 @@
+"use strict";
 const aws = require("aws-sdk");
 
 module.exports = async function (address, template, templateData) {
-  console.log(address);
-
   const params = {
     Destination: {
       ToAddresses: [address],
@@ -14,9 +13,9 @@ module.exports = async function (address, template, templateData) {
   };
 
   try {
-    const data = await new aws.SES().sendTemplatedEmail(params).promise();
-    console.log(data);
+    await new aws.SES().sendTemplatedEmail(params).promise();
   } catch (err) {
     console.error(err, err.stack);
+    return Promise.reject(err);
   }
 };

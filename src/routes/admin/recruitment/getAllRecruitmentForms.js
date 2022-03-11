@@ -4,6 +4,7 @@ const Category = require("$models/Category");
 const guard = require("express-jwt-permissions")();
 const filterQuery = require("$util/filterQuery");
 const getCache = require("$util/getCache");
+const pick = require("lodash/pick");
 
 const { query } = require("express-validator");
 const { validate } = require("$util");
@@ -25,16 +26,25 @@ const validators = validate([
 ]);
 
 const getAllRecruitmentForm = async (req, res, next) => {
-  const filters = req.query.filters || null,
-    isInitial = req.query.isInitial,
-    nextCursor = req.query.nextCursor;
+  const filters = pick(req.query, [
+    "limit",
+    "exclude",
+    "searchByApplicant",
+    "category_id",
+    "status",
+  ]);
+  const isInitial = req.query.isInitial;
+  const nextCursor = req.query.nextCursor;
 
   const formQuery = filterQuery(
     UserForm.query()
       .joinRelated("form.[category]")
       .withGraphFetched("applicant(defaultSelects)")
+      .orderBy("created_at", "desc")
+      .orderBy("id")
       .select(select),
-    filters
+    filters,
+    "user_forms"
   );
 
   let response = {};

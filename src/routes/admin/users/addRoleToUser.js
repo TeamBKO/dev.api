@@ -34,7 +34,9 @@ const addRoleToUser = async function (req, res, next) {
       .returning("*");
 
     const sessions = await getUserSessions(userId);
-    if (sessions && sessions.length) await redis.multi(sessions).exec();
+    if (sessions && sessions.length) {
+      await redis.multi(sessions).exec();
+    }
 
     await trx.commit();
     await redis.del(`user_${userId}`);

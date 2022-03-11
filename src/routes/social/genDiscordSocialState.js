@@ -1,7 +1,7 @@
 "use strict";
-const { nanoid } = require("nanoid");
 const User = require("$models/User");
 const redis = require("$services/redis");
+const { nanoid } = require("nanoid");
 
 const genStateForDiscordSocialAccountLink = async (req, res, next) => {
   const user = await User.query()

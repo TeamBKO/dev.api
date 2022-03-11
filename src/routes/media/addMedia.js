@@ -38,9 +38,17 @@ const uploadMedia = async function (req, res, next) {
   const trx = await Media.startTransaction();
 
   try {
-    await Media.query(trx).insert(data);
+    const result = await Media.query(trx).insert(data).returning("id");
+
     await trx.commit();
-    res.sendStatus(204);
+
+    const media = await Media.query()
+      .withGraphFetched("uploader(defaultSelects)")
+      .whereIn(
+        "id",
+        result.map(({ id }) => id)
+      );
+    res.status(200).send(media);
   } catch (err) {
     await trx.rollback();
     next(err);

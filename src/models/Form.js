@@ -13,14 +13,22 @@ class Form extends cursor(dateMixin(Model)) {
     return "forms";
   }
 
+  static get modifiers() {
+    return {
+      default: (qb) => qb.select("id", "name"),
+      id: (qb) => qb.select(["id as form_id", "description"]),
+    };
+  }
+
   static get jsonSchema() {
     return {
       type: "object",
+      required: ["name", "creator_id"],
       properties: {
         id: { type: "integer" },
         creator_id: { type: "integer" },
-        category_id: { type: "integer" },
-        name: { type: "string " },
+        // category_id: { type: "integer" },
+        name: { type: "string" },
         created_at: { type: "string" },
         updated_at: { type: "string" },
       },
@@ -29,9 +37,8 @@ class Form extends cursor(dateMixin(Model)) {
 
   static get relationMappings() {
     const Field = require("$models/Field");
-    const FormCategory = require("$models/FormCategory");
-    const Category = require("$models/Category");
     const User = require("$models/User");
+    const Roster = require("$models/Roster");
     return {
       created_by: {
         relation: Model.BelongsToOneRelation,
@@ -41,22 +48,20 @@ class Form extends cursor(dateMixin(Model)) {
           to: "users.id",
         },
       },
-      category: {
-        relation: Model.BelongsToOneRelation,
-        modelClass: Category,
-        join: {
-          from: "forms.category_id",
-          to: "categories.id",
-        },
-      },
-      form_category: {
-        relation: Model.HasOneRelation,
-        modelClass: FormCategory,
+
+      rosters: {
+        relation: Model.ManyToManyRelation,
+        modelClass: Roster,
         join: {
           from: "forms.id",
-          to: "form_category.form_id",
+          through: {
+            from: "roster_forms.form_id",
+            to: "roster_forms.roster_id",
+          },
+          to: "rosters.id",
         },
       },
+
       fields: {
         relation: Model.ManyToManyRelation,
         modelClass: Field,

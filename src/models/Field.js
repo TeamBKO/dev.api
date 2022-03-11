@@ -26,32 +26,32 @@ class Field extends Model {
     };
   }
 
-  static get relationMappings() {
-    const FormFields = require("$models/FormFields");
-    const Form = require("$models/Form");
-    return {
-      // form: {
-      //   relation: Model.ManyToManyRelation,
-      //   modelClass: Form,
-      //   join: {
-      //     from: "fields.id",
-      //     through: {
-      //       from: "form_fields.field_id",
-      //       to: "form_fields.form_id",
-      //     },
-      //     to: "forms.id",
-      //   },
-      // },
-      // form: {
-      //   relation: Model.HasOneRelation,
-      //   modelClass: FormFields,
-      //   join: {
-      //     from: "fields.id",
-      //     to: "form_fields.field_id",
-      //   },
-      // },
-    };
-  }
+  // static get relationMappings() {
+  //   const FormField = require("$models/FormField");
+  //   const Form = require("$models/Form");
+  //   return {
+  //     form: {
+  //       relation: Model.ManyToManyRelation,
+  //       modelClass: Form,
+  //       join: {
+  //         from: "fields.id",
+  //         through: {
+  //           from: "form_fields.field_id",
+  //           to: "form_fields.form_id",
+  //         },
+  //         to: "forms.id",
+  //       },
+  //     },
+  //     form: {
+  //       relation: Model.HasOneRelation,
+  //       modelClass: FormFields,
+  //       join: {
+  //         from: "fields.id",
+  //         to: "form_fields.field_id",
+  //       },
+  //     },
+  //   };
+  // }
 }
 
 module.exports = Field;

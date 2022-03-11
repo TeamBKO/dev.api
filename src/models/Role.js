@@ -26,6 +26,7 @@ class Role extends cursor(dateMixin(Model)) {
   static get jsonSchema() {
     return {
       type: "object",
+      required: ["name"],
       properties: {
         id: { type: "integer" },
         name: { type: "string" },
@@ -38,7 +39,7 @@ class Role extends cursor(dateMixin(Model)) {
 
   static get relationMappings() {
     const Users = require("$models/User");
-    const Policies = require("$models/Policies");
+    const Policy = require("$models/Policy");
     const DiscordRole = require("$models/DiscordRole");
     return {
       users: {
@@ -69,7 +70,7 @@ class Role extends cursor(dateMixin(Model)) {
 
       policies: {
         relation: Model.ManyToManyRelation,
-        modelClass: Policies,
+        modelClass: Policy,
         join: {
           from: "roles.id",
           through: {
@@ -82,6 +83,35 @@ class Role extends cursor(dateMixin(Model)) {
     };
   }
 
+  static async createRole(data, returning = "*") {
+    const trx = await this.startTransaction();
+
+    try {
+      const role = await this.query(trx)
+        .insert(data.details)
+        .returning(returning);
+
+      if (data.policies && data.policies.length) {
+        await this.relatedQuery("policies", trx)
+          .for(role.id)
+          .relate(data.policies);
+      }
+
+      if (data.discord_roles && data.discord_roles.length) {
+        await this.relatedQuery("discord_roles", trx)
+          .for(role.id)
+          .relate(data.discord_roles);
+      }
+
+      await trx.commit();
+
+      return role;
+    } catch (err) {
+      await trx.rollback();
+      return Promise.reject(err);
+    }
+  }
+
   static async updateRole(id, data, trx) {
     let queries = [];
     let relationQuery = (relation) =>
@@ -90,10 +120,11 @@ class Role extends cursor(dateMixin(Model)) {
     let queryData = { updated_at: new Date().toISOString() };
 
     if (data.details && Object.keys(data.details).length) {
-      Object.assign(queryData, data.details);
+      queries.push(query.patch(data.details).where("id", id));
+      // Object.assign(queryData, data.details);
     }
 
-    queries.push(query.patch(queryData).where("id", id));
+    // queries.push(query.patch(queryData).where("id", id));
 
     if (data.addPolicies && data.addPolicies.length) {
       const relate = relationQuery("policies").for(id).relate(data.addPolicies);

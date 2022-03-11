@@ -12,10 +12,6 @@ module.exports = async function authentiateSocketClient(socket) {
       verified = await verifyToken(token, process.env.JWT_REFRESH_SECRET);
 
       if (!verified) {
-        const error = new Error("UNAUTHORIZED");
-        error.data = { content: "Please retry later." };
-        console.log("disconnecting socket.");
-
         socket.disconnect(true);
       }
 
@@ -31,10 +27,10 @@ module.exports = async function authentiateSocketClient(socket) {
 
       socket.join(`user:${verified.id}`);
     } catch (err) {
-      console.log(socket.handshake.auth.token);
-      socket.disconnect(true);
+      return socket.disconnect(true);
     }
   } else {
+    const err = new Error("UNAUTHORIZED");
     return socket.disconnect(true);
   }
 

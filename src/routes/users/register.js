@@ -30,7 +30,7 @@ const register = async function (req, res, next) {
 
   try {
     const [user, settings] = await Promise.all([
-      User.createUser(creds, [{ id: 3 }], trx),
+      User.createUser(creds, [{ id: 3 }], null, trx),
       Settings.query()
         .where("id", 1)
         .select("universal_request_ttl_in_minutes")

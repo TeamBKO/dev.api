@@ -1,26 +1,4 @@
 "use strict";
-
-// const moduleAlias = require("module-alias");
-
-// const { fdir } = require("fdir");
-
-// /*** SETUP MODEL PATHS ***/
-// const models = new fdir()
-//   .withFullPaths()
-//   .withMaxDepth(3)
-//   .filter((path) => /models/.test(path))
-//   .crawl("./src/routes")
-//   .sync();
-
-// const aliases = models.reduce((obj, path) => {
-//   const split = path.split("/");
-//   const filename = split[split.length - 1].replace(".js", "");
-//   obj[`$models/${filename}`] = path;
-//   return obj;
-// }, {});
-
-// moduleAlias.addAliases(aliases);
-
 /*** REGISTER MODULES ***/
 require("module-alias/register");
 
@@ -30,8 +8,8 @@ const http = require("http");
 const redis = require("$services/redis");
 const sub = redis.duplicate();
 
-const verifySocketToken = require("$util/verifySocketToken");
-const authenticateSocketClient = require("$util/authenticateSocketClient");
+const verifySocketToken = require("$services/sockets/verifySocketToken");
+const authenticateSocketClient = require("$services/sockets/authenticateSocketClient");
 const onSignal = require("$util/onSignal");
 
 const { Server } = require("socket.io");

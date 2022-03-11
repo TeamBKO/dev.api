@@ -2,7 +2,7 @@
 const UserSession = require("$models/UserSession");
 const User = require("$models/User");
 const Settings = require("$models/Settings");
-const Roles = require("$models/Roles");
+const Role = require("$models/Role");
 const jwt = require("jsonwebtoken");
 const DiscordClient = require("$services/discord");
 const redis = require("$services/redis");
@@ -14,8 +14,8 @@ const { nanoid } = require("nanoid");
 const { validate } = require("$util");
 const { transaction } = require("objection");
 
-const redirect_uri = "http://localhost:3000";
-
+const redirect_uri = process.env.BASE_URL;
+// const redirect_uri = "http://localhost:3000"
 const client = new DiscordClient(
   process.env.DISCORD_CLIENT_ID,
   process.env.DISCORD_SECRET,
@@ -46,7 +46,7 @@ const loginWithDiscord = async (req, res, next) => {
 
     if (!dUser) {
       await trx.rollback();
-      return res.status(500).send({ message: "User doesn't exist." });
+      return res.status(404).send({ message: "User doesn't exist." });
     }
 
     if (!dUser.emailVerified) {
@@ -76,7 +76,7 @@ const loginWithDiscord = async (req, res, next) => {
           dUser.id
         );
 
-        const discordAssignedRoles = await Roles.query()
+        const discordAssignedRoles = await Role.query()
           .joinRelated("discord_roles")
           .select("roles.id as id")
           .whereIn("discord_role_id", guildMember._roles);
@@ -107,7 +107,7 @@ const loginWithDiscord = async (req, res, next) => {
         password,
       };
 
-      user = await User.createUser(data, roles, trx);
+      user = await User.createUser(data, roles, null, trx);
     }
 
     const tokenData = generateTokenData(user);

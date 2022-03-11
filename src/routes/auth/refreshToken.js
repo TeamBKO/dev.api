@@ -1,6 +1,5 @@
 "use strict";
 const User = require("$models/User");
-const UserSession = require("$models/UserSession");
 const UnauthorizedError = require("express-jwt/lib/errors/UnauthorizedError");
 const generateTokenData = require("$util/generateTokenData");
 const jwt = require("jsonwebtoken");
@@ -23,7 +22,13 @@ const select = ["users.id", "users.username", "users.discord_id"];
 const refreshToken = async (req, res, next) => {
   const { refresh_token } = req.body;
 
-  const token = jwt.verify(refresh_token, process.env.JWT_REFRESH_SECRET);
+  let token;
+
+  try {
+    token = jwt.verify(refresh_token, process.env.JWT_REFRESH_SECRET);
+  } catch (err) {
+    next(err);
+  }
 
   if (!token) return res.status(400).send({ message: "Token was malformed." });
 
@@ -56,14 +61,6 @@ const refreshToken = async (req, res, next) => {
   const access_token = jwt.sign(tokenData, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_TOKEN_DURATION,
   });
-
-  /** UPDATE THE SESSION DATA WITH THE NEW ACCESS TOKEN JTI */
-
-  // await UserSession.query()
-  //   .patch({ token_id: tokenData.jti })
-  //   .where("token_id", token.jti);
-
-  // await redis.del(`blacklist:${session.jti}`);
 
   res.status(200).send({ access_token });
 };

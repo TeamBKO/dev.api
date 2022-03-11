@@ -7,21 +7,28 @@ const cursor = require("objection-cursor")({
     hasMore: true,
   },
 });
+const guid = require("$util/mixins/guid")();
 
-class UserForm extends cursor(dateMixin(Model)) {
+class UserForm extends cursor(guid(dateMixin(Model))) {
   static get tableName() {
     return "user_forms";
+  }
+
+  static get modifiers() {
+    return {
+      default: (qb) => qb.select("id"),
+    };
   }
 
   static get jsonSchema() {
     return {
       type: "object",
-      required: ["user_id", "form_id"],
+      required: ["form_id"],
       properties: {
-        id: { type: "integer" },
+        id: { type: "string" },
         form_id: { type: "integer" },
-        user_id: { type: "integer" },
-        status: { type: "string" },
+        roster_member_id: { type: "string" },
+        // status: { type: "string" },
         created_at: { type: "string" },
         updated_at: { type: "string" },
       },
@@ -30,16 +37,17 @@ class UserForm extends cursor(dateMixin(Model)) {
 
   static get relationMappings() {
     const User = require("$models/User");
+    const RosterMember = require("$models/RosterMember");
     const Form = require("$models/Form");
     const UserFormField = require("$models/UserFormField");
     const Field = require("$models/Field");
     return {
       applicant: {
         relation: Model.BelongsToOneRelation,
-        modelClass: User,
+        modelClass: RosterMember,
         join: {
-          from: "user_forms.user_id",
-          to: "users.id",
+          from: "user_forms.roster_member_id",
+          to: "roster_members.id",
         },
       },
       form: {
@@ -71,18 +79,6 @@ class UserForm extends cursor(dateMixin(Model)) {
           to: "user_form_fields.form_id",
         },
       },
-      // fields: {
-      //   relation: Model.ManyToManyRelation,
-      //   modelClass: UserFormField,
-      //   join: {
-      //     from: "user_forms.id",
-      //     through: {
-      //       from: "user_form_fields.form_id",
-      //       to: "user_form_fields.field_id",
-      //     },
-      //     to: "user_form_fields.id",
-      //   },
-      // },
     };
   }
 }

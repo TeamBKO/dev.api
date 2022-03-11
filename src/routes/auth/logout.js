@@ -1,9 +1,10 @@
 "use strict";
+const UserSession = require("$models/UserSession");
+const jwt = require("jsonwebtoken");
+
 const { validate } = require("$util");
 const { header } = require("express-validator");
 const redis = require("$services/redis");
-const UserSession = require("$models/UserSession");
-const jwt = require("jsonwebtoken");
 
 const logout = async function (req, res, next) {
   if (req.headers && req.headers.authorization) {

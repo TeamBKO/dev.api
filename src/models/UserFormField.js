@@ -19,7 +19,7 @@ class UserFormField extends dateMixin(Model) {
       required: ["form_id", "field_id", "answer"],
       properties: {
         id: { type: "integer" },
-        form_id: { type: "integer" },
+        form_id: { type: "string" },
         field_id: { type: "integer" },
         answer: { type: "string" },
         created_at: { type: "string" },
@@ -29,7 +29,7 @@ class UserFormField extends dateMixin(Model) {
   }
 
   static get relationMappings() {
-    const UserForm = require("./UserForm");
+    const UserForm = require("$models/UserForm");
     const Field = require("$models/Field");
     return {
       form: {

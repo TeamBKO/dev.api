@@ -79,7 +79,7 @@ const updateEmailRequest = async function (req, res, next) {
     const [account, settings] = await Promise.all([
       User.query()
         .where({ id, email, active: true })
-        .select("id", "password", "email", "active")
+        .select("id", "username", "password", "email", "active")
         .first()
         .throwIfNotFound(),
       Settings.query().select(["universal_request_ttl_in_minutes"]).first(),
@@ -107,6 +107,7 @@ const updateEmailRequest = async function (req, res, next) {
     );
 
     await sendEmail(account.email, "CHANGE_EMAIL", {
+      username: account.username,
       code,
     });
 

@@ -8,6 +8,17 @@ const cursor = require("objection-cursor")({
   },
 });
 
+const userList = (req, key) => {
+  if (req.body[key]) {
+    return Array.isArray(req.body[key])
+      ? req.body[key].length > 1
+        ? req.body[key]
+        : req.body[key][0]
+      : req.body[key];
+  }
+  return false;
+};
+
 class Media extends cursor(guid(dateMixin(Model))) {
   static get tableName() {
     return "media";
@@ -75,6 +86,44 @@ class Media extends cursor(guid(dateMixin(Model))) {
         },
       },
     };
+  }
+
+  static async updateSharing(req) {
+    const result = {};
+
+    const add = userList(req, "add");
+    const remove = userList(req, "remove");
+
+    const trx = await this.startTransaction();
+
+    try {
+      if (add || (Array.isArray(add) && add.length)) {
+        const added = await Media.relatedQuery("media_shared_users", trx)
+          .for(req.params.id)
+          .relate(add);
+        Object.assign(result, { added });
+      }
+
+      if (remove) {
+        let removed = Media.relatedQuery("media_shared_users", trx)
+          .for(req.params.id)
+          .unrelate();
+        if (Array.isArray(remove) && remove.length) {
+          removed = removed.whereIn("users.id", remove);
+        } else {
+          removed = removed.where("users.id", remove);
+        }
+
+        Object.assign(result, { removed: await removed });
+      }
+
+      await trx.commit();
+
+      return result;
+    } catch (err) {
+      await trx.rollback();
+      return Promise.reject(err);
+    }
   }
 }
 

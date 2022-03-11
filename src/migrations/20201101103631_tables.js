@@ -1,5 +1,7 @@
 "use strict";
 
+const { isTuesday } = require("date-fns");
+
 exports.up = function (knex) {
   return Promise.all([
     knex.schema.hasTable("users").then((exists) => {
@@ -126,18 +128,15 @@ exports.up = function (knex) {
     knex.schema.hasTable("user_forms").then((exists) => {
       if (exists) return;
       return knex.schema.createTable("user_forms", (t) => {
-        t.increments("id").primary();
+        t.uuid("id").primary();
         t.integer("form_id")
           .references("id")
           .inTable("forms")
           .onDelete("CASCADE");
-        t.integer("user_id")
-          .references("id")
-          .inTable("users")
-          .onDelete("CASCADE");
-        t.enum("status", ["pending", "accepted", "rejected"]).defaultTo(
-          "pending"
-        );
+        t.uuid("roster_member_id")
+          .references("roster_members.id")
+          .onDelete("CASCADE")
+          .onUpdate("CASCADE");
         t.timestamps();
       });
     }),
@@ -145,7 +144,7 @@ exports.up = function (knex) {
       if (exists) return;
       return knex.schema.createTable("user_form_fields", (t) => {
         t.increments("id").primary();
-        t.integer("form_id")
+        t.uuid("form_id")
           .references("user_forms.id")
           .onDelete("CASCADE")
           .onUpdate("CASCADE");
@@ -283,7 +282,6 @@ exports.up = function (knex) {
         t.increments("id").primary();
         t.string("name").unique();
         t.string("image").nullable();
-        t.boolean("enable_recruitment").defaultTo(false);
         t.boolean("is_deletable").defaultTo(true);
         t.timestamps();
       });
@@ -308,12 +306,133 @@ exports.up = function (knex) {
         t.timestamps();
       });
     }),
+    knex.schema.hasTable("rosters").then((exists) => {
+      if (exists) return;
+      return knex.schema.createTable("rosters", (t) => {
+        t.uuid("id").primary();
+        t.string("name").unique();
+
+        t.string("icon").nullable();
+        t.boolean("enable_recruitment").defaultTo(false);
+        t.boolean("apply_roles_on_approval").defaultTo(false);
+        t.boolean("private").defaultTo(false);
+        // t.integer("roster_form")
+        //   .references("forms.id")
+        //   .onDelete("CASCADE")
+        //   .onUpdate("CASCADE");
+        t.integer("creator_id")
+          .references("users.id")
+          .onDelete("CASCADE")
+          .onUpdate("CASCADE");
+        t.boolean("is_deletable").defaultTo(true);
+        t.boolean("is_disabled").defaultTo(false);
+        t.timestamps();
+      });
+    }),
+    knex.schema.hasTable("roster_members").then((exists) => {
+      if (exists) return;
+      return knex.schema.createTable("roster_members", (t) => {
+        t.uuid("id").primary();
+        t.uuid("roster_id")
+          .references("rosters.id")
+          .onDelete("CASCADE")
+          .onUpdate("CASCADE");
+
+        t.integer("member_id")
+          .references("users.id")
+          .onDelete("CASCADE")
+          .onUpdate("CASCADE");
+        t.enum("status", ["pending", "approved", "rejected"]).defaultTo(
+          "pending"
+        );
+        // t.boolean("approved").defaultTo(false);
+        t.uuid("roster_rank_id").references("roster_ranks.id");
+        t.timestamp("approved_on");
+        t.timestamps();
+      });
+    }),
+    knex.schema.hasTable("roster_member_permissions").then((exists) => {
+      if (exists) return;
+      return knex.schema.createTable("roster_member_permissions", (t) => {
+        t.uuid("id").primary();
+        t.uuid("member_id")
+          .references("roster_members.id")
+          .onDelete("CASCADE")
+          .onUpdate("CASCADE");
+        t.boolean("can_add_members").default(false);
+        t.boolean("can_edit_members").default(false);
+        t.boolean("can_remove_members").default(false);
+        t.boolean("can_edit_roster_details").default(false);
+        t.boolean("can_delete_roster").default(false);
+      });
+    }),
+    knex.schema.hasTable("roster_ranks").then((exists) => {
+      if (exists) return;
+      return knex.schema.createTable("roster_ranks", (t) => {
+        t.uuid("id").primary();
+        t.uuid("roster_id")
+          .references("rosters.id")
+          .onDelete("CASCADE")
+          .onUpdate("CASCADE");
+        // t.uuid("roster_member_id").references("roster_members.id");
+        // t.uuid("roster_permission_id")
+        //   .references("roster_permissions.id")
+        //   .onDelete("CASCADE")
+        //   .onUpdate("CASCADE");
+        t.string("name");
+        t.string("icon");
+        t.boolean("is_deletable").defaultTo(true);
+        t.boolean("is_disabled").defaultTo(false);
+        t.timestamps();
+      });
+    }),
+    knex.schema.hasTable("roster_forms").then((exists) => {
+      if (exists) return;
+      return knex.schema.createTable("roster_forms", (t) => {
+        t.uuid("roster_id")
+          .references("rosters.id")
+          .onDelete("CASCADE")
+          .onUpdate("CASCADE");
+        t.integer("form_id")
+          .references("forms.id")
+          .onDelete("CASCADE")
+          .onUpdate("CASCADE");
+      });
+    }),
+    knex.schema.hasTable("roster_permissions").then((exists) => {
+      if (exists) return;
+      return knex.schema.createTable("roster_permissions", (t) => {
+        t.uuid("id").primary();
+        t.uuid("roster_rank_id")
+          .references("roster_ranks.id")
+          .onDelete("CASCADE")
+          .onUpdate("CASCADE");
+        t.boolean("can_add_members").default(false);
+        t.boolean("can_edit_members").default(false);
+        t.boolean("can_remove_members").default(false);
+        t.boolean("can_edit_roster_details").default(false);
+        t.boolean("can_delete_roster").default(false);
+      });
+    }),
+    knex.schema.hasTable("roster_roles").then((exists) => {
+      if (exists) return;
+      return knex.schema.createTable("roster_roles", (t) => {
+        t.uuid("roster_id")
+          .references("rosters.id")
+          .onDelete("CASCADE")
+          .onUpdate("CASCADE");
+        t.integer("role_id")
+          .references("roles.id")
+          .onDelete("CASCADE")
+          .onUpdate("CASCADE");
+      });
+    }),
     knex.schema.hasTable("forms").then((exists) => {
       if (exists) return;
       return knex.schema.createTable("forms", (t) => {
         t.increments("id").primary();
-        t.integer("category_id")
-          .references("categories.id")
+        t.uuid("roster_id")
+          .references("rosters.id")
           .onUpdate("CASCADE")
           .onDelete("CASCADE");
         t.integer("creator_id")
@@ -322,7 +441,7 @@ exports.up = function (knex) {
           .onDelete("CASCADE");
         t.string("name");
         t.text("description");
-        t.boolean("status").defaultTo(false);
+        // t.boolean("status").defaultTo(false);
         t.boolean("is_deletable").defaultTo(true);
         t.timestamps();
       });
@@ -408,8 +527,14 @@ exports.up = function (knex) {
     knex.schema.hasTable("media_share").then((exists) => {
       if (exists) return;
       return knex.schema.createTable("media_share", (t) => {
-        t.uuid("media_id").references("media.id").onDelete("CASCADE");
-        t.integer("user_id").references("users.id").onUpdate("CASCADE");
+        t.uuid("media_id")
+          .references("media.id")
+          .onDelete("CASCADE")
+          .onUpdate("CASCADE");
+        t.integer("user_id")
+          .references("users.id")
+          .onDelete("CASCADE")
+          .onUpdate("CASCADE");
       });
     }),
   ]);
@@ -418,7 +543,8 @@ exports.up = function (knex) {
 exports.down = async function (knex) {
   try {
     await knex.raw(
-      `DROP TABLE IF EXISTS media_share, user_form_fields,
+      `DROP TABLE IF EXISTS rosters, roster_forms, roster_member_permissions, roster_permissions, roster_members, 
+      roster_ranks, roster_roles, media_share, user_form_fields,
       user_forms, user_sessions, user_policies, form_fields, fields, 
       forms, menu_tree, menu, event_participants, 
       event_roles, event_meta, events, categories, 

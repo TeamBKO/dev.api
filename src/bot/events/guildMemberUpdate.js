@@ -1,5 +1,5 @@
 "use strict";
-const Roles = require("$models/Roles");
+const Role = require("$models/Role");
 const User = require("$models/User");
 
 class DiscordMember {
@@ -41,37 +41,28 @@ module.exports = {
 
     console.log(m);
 
-    // const user = await User.query().where("discord_id", m.id).select("id");
+    const user = await User.query().where("discord_id", m.id).select("id");
 
-    // if (!user) return;
+    if (!user) return;
 
-    // const roles = await Roles.query()
-    //   .withGraphJoined("role_maps")
-    //   .whereIn("role_maps.discord_role_id", m.roles)
-    //   .select("role_id as id");
+    const roles = await Role.query()
+      .withGraphJoined("role_maps")
+      .whereIn("role_maps.discord_role_id", m.roles)
+      .select("role_id as id");
 
-    // const roles = await Roles.query()
-    //   .join("role_maps", function () {
-    //     this.on("role_maps.role_id", "=", "roles.id").onIn(
-    //       "role_maps.discord_role_id",
-    //       m.roles
-    //     );
-    //   })
-    //   .select("role_id as id");
+    if (!roles || !roles.length) return;
 
-    // if (!roles || !roles.length) return;
+    const options = { relate: true, unrelate: true };
 
-    // const options = { relate: true, unrelate: true };
+    const data = { id: user.id, roles };
 
-    // const data = { id: user.id, roles };
+    const trx = await User.startTransaction();
 
-    // const trx = await User.startTransaction();
-
-    // try {
-    //   await User.query(trx).upsertGraph(data, options);
-    //   await trx.commit();
-    // } catch (err) {
-    //   await trx.rollback();
-    // }
+    try {
+      await User.query(trx).upsertGraph(data, options);
+      await trx.commit();
+    } catch (err) {
+      await trx.rollback();
+    }
   },
 };

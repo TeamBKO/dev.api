@@ -1,6 +1,12 @@
 const { Model } = require("objection");
+const cursor = require("objection-cursor")({
+  limit: 50,
+  pageInfo: {
+    hasMore: true,
+  },
+});
 
-class DiscordRole extends Model {
+class DiscordRole extends cursor(Model) {
   static get tableName() {
     return "discord_roles";
   }

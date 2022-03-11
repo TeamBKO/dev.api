@@ -9,6 +9,8 @@ const { VIEW_ALL_ADMIN, DELETE_ALL_FORMS } = require("$util/policies");
 const { transaction } = require("objection");
 
 const removeForm = async function (req, res, next) {
+  const trx = await Form.startTransaction();
+
   try {
     const deleted = await Form.query(trx)
       .whereIn("id", req.query.ids)
@@ -27,14 +29,6 @@ const removeForm = async function (req, res, next) {
     await trx.rollback();
     next(err);
   }
-
-  const deleted = await Form.query(trx)
-    .whereIn("id", req.query.ids)
-    .del()
-    .first()
-    .returning("id");
-
-  res.status(200).send(results);
 };
 
 module.exports = {

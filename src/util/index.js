@@ -6,9 +6,6 @@ const phin = require("phin");
 const shouldRevokeToken = (req) => {
   const { addPolicies, removePolicies, addRoles, removeRoles } = req.body;
 
-  console.log(removePolicies);
-  console.log(removeRoles);
-
   if (
     (addPolicies && Array.isArray(addPolicies)) ||
     (removePolicies && Array.isArray(removePolicies))

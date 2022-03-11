@@ -4,14 +4,14 @@ const guard = require("express-jwt-permissions")();
 const { query } = require("express-validator");
 const filterQuery = require("$util/filterQuery");
 const { validate } = require("$util");
-const { VIEW_ALL_ADMIN, VIEW_ALL_CATEGORIES } = require("$util/policies");
+const { VIEW_ALL_ADMIN, VIEW_ALL_TAGS } = require("$util/policies");
 
 const getAllCategories = async function (req, res, next) {
   const nextCursor = req.query.nextCursor;
 
   let query = filterQuery(
-    Tag.query().orderBy("id").orderBy("created_at"),
-    req.query.filters
+    Tag.query().orderBy("created_at", "desc").orderBy("id"),
+    req.query
   );
 
   let tags;
@@ -29,7 +29,7 @@ module.exports = {
   path: "/",
   method: "GET",
   middleware: [
-    guard.check([VIEW_ALL_ADMIN, VIEW_ALL_CATEGORIES]),
+    guard.check([VIEW_ALL_ADMIN, VIEW_ALL_TAGS]),
     validate([query("nextCursor").optional().isString().trim().escape()]),
   ],
   handler: getAllCategories,

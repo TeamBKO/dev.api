@@ -52,11 +52,11 @@ const getSharingList = async function (req, res) {
 
   if (searchByUsername) {
     sharingList = sharingList
-      .andWhere("media_shared_users.username", "like", `%${searchByUsername}%`)
+      .andWhere("media_shared_users.username", "like", `${searchByUsername}%`)
       .debug();
 
     userQuery = userQuery
-      .andWhere("username", "like", `%${searchByUsername}%`)
+      .andWhere("username", "like", `${searchByUsername}%`)
       .debug();
   }
 
