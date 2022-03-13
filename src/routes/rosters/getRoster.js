@@ -29,10 +29,17 @@ const getRoster = async function (req, res, next) {
     .first();
 
   const membersQuery = RosterMember.query()
-    .select(["id", "status", "approved_on"])
+    .joinRelated("member(defaultSelects)")
+    .select([
+      "roster_members.id",
+      "roster_members.status",
+      "roster_members.approved_on",
+      "member.username as username",
+      "member.avatar as avatar",
+    ])
     .where("status", "approved")
     .andWhere("roster_id", req.params.id)
-    .withGraphFetched("[member(defaultSelects), rank(default), form(default)]")
+    .withGraphFetched("[rank(default), form(default)]")
     .limit(25)
     .cursorPage();
 

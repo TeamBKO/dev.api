@@ -32,19 +32,24 @@ const select = [
   "roster_members.id",
   "roster_members.status",
   "roster_members.approved_on",
-  // "members:member.name",
-  // "members:member.avatar",
-  // "members:member.id",
+  "member.username as username",
+  "member.avatar as avatar",
 ];
 
 const getRosterMembers = async function (req, res, next) {
-  const filters = pick(req.query, ["status", "rank", "searchByMemberName"]);
+  const filters = pick(req.query, [
+    "status",
+    "rank",
+    "searchByMemberName",
+    "exclude",
+  ]);
   const nextCursor = req.query.nextCursor;
   const memberQuery = filterQuery(
     RosterMember.query()
+      .joinRelated("[member(defaultSelects)]")
       .select(select)
       .where("roster_members.roster_id", req.params.id)
-      .withGraphJoined("[member(defaultSelects), rank, form(default)]"),
+      .withGraphFetched("[rank, form(default)]"),
     filters,
     "roster_members"
   );

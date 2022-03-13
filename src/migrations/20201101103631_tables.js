@@ -311,11 +311,12 @@ exports.up = function (knex) {
       return knex.schema.createTable("rosters", (t) => {
         t.uuid("id").primary();
         t.string("name").unique();
-
+        t.string("banner").nullable();
         t.string("icon").nullable();
         t.boolean("enable_recruitment").defaultTo(false);
         t.boolean("apply_roles_on_approval").defaultTo(false);
         t.boolean("private").defaultTo(false);
+        t.boolean("auto_approve").defaultTo(false);
         // t.integer("roster_form")
         //   .references("forms.id")
         //   .onDelete("CASCADE")
@@ -337,14 +338,16 @@ exports.up = function (knex) {
           .references("rosters.id")
           .onDelete("CASCADE")
           .onUpdate("CASCADE");
-
         t.integer("member_id")
           .references("users.id")
           .onDelete("CASCADE")
           .onUpdate("CASCADE");
-        t.enum("status", ["pending", "approved", "rejected"]).defaultTo(
-          "pending"
-        );
+        t.enum("status", [
+          "pending",
+          "approved",
+          "rejected",
+          "removed",
+        ]).defaultTo("pending");
         // t.boolean("approved").defaultTo(false);
         t.uuid("roster_rank_id").references("roster_ranks.id");
         t.timestamp("approved_on");
@@ -361,6 +364,9 @@ exports.up = function (knex) {
           .onUpdate("CASCADE");
         t.boolean("can_add_members").default(false);
         t.boolean("can_edit_members").default(false);
+        t.boolean("can_add_ranks").default(false);
+        t.boolean("can_edit_ranks").default(false);
+        t.boolean("can_remove_ranks").default(false);
         t.boolean("can_remove_members").default(false);
         t.boolean("can_edit_roster_details").default(false);
         t.boolean("can_delete_roster").default(false);
@@ -374,13 +380,9 @@ exports.up = function (knex) {
           .references("rosters.id")
           .onDelete("CASCADE")
           .onUpdate("CASCADE");
-        // t.uuid("roster_member_id").references("roster_members.id");
-        // t.uuid("roster_permission_id")
-        //   .references("roster_permissions.id")
-        //   .onDelete("CASCADE")
-        //   .onUpdate("CASCADE");
         t.string("name");
         t.string("icon");
+        t.boolean("priority").defaultTo(false);
         t.boolean("is_deletable").defaultTo(true);
         t.boolean("is_disabled").defaultTo(false);
         t.timestamps();
@@ -410,6 +412,9 @@ exports.up = function (knex) {
         t.boolean("can_add_members").default(false);
         t.boolean("can_edit_members").default(false);
         t.boolean("can_remove_members").default(false);
+        t.boolean("can_add_ranks").default(false);
+        t.boolean("can_edit_ranks").default(false);
+        t.boolean("can_remove_ranks").default(false);
         t.boolean("can_edit_roster_details").default(false);
         t.boolean("can_delete_roster").default(false);
       });

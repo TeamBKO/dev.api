@@ -35,6 +35,9 @@ const insertFn = (form_id, roster_id, member_id, rank_id, fields) => {
       can_add_members: false,
       can_edit_members: false,
       can_remove_members: false,
+      can_add_ranks: false,
+      can_edit_ranks: false,
+      can_remove_ranks: false,
       can_edit_roster_details: false,
       can_delete_roster: false,
     },
@@ -58,7 +61,7 @@ const addRosterApplicant = async function (req, res, next) {
   const { form_id, roster_id, fields } = req.body;
 
   const options = {
-    relate: ["form", "form.form_fields", "permissions"],
+    relate: ["rank", "form", "form.form_fields", "permissions"],
   };
 
   const userAlreadySubmitted = await RosterMember.query()
@@ -77,12 +80,13 @@ const addRosterApplicant = async function (req, res, next) {
     });
   }
 
-  const { id } = await RosterRank.query()
+  const rank = await RosterRank.query()
+    .select("id")
     .where("name", "Recruit")
     .andWhere("roster_id", roster_id)
-    .returning("id");
+    .first();
 
-  const insert = insertFn(form_id, roster_id, req.user.id, id, fields);
+  const insert = insertFn(form_id, roster_id, req.user.id, rank.id, fields);
 
   const trx = await RosterMember.startTransaction();
 
