@@ -1,9 +1,34 @@
 "use strict";
 
-const { isTuesday } = require("date-fns");
+const ON_BEFORE_INSERT_FUNCTION = `
+CREATE OR REPLACE FUNCTION ignore_dups()
+RETURNS trigger as $$
+BEGIN
+  If Exists (
+    Select 
+    * 
+    FROM user_roles 
+    WHERE user_id = NEW.user_id
+    AND role_id = NEW.role_id 
+  ) Then
+    Return NULL;
+  End If;
+  Return NEW;
+End;
+$$ Language plpgsql;`;
+
+const DROP_BEFORE_INSERT = `DROP FUNCTION ignore_dups()`;
+
+const CREATE_TRIGGER = `
+Create Trigger ignore_dups
+Before Insert On user_roles
+For Each Row
+Execute Procedure ignore_dups()
+`;
 
 exports.up = function (knex) {
   return Promise.all([
+    knex.raw(ON_BEFORE_INSERT_FUNCTION),
     knex.schema.hasTable("users").then((exists) => {
       if (exists) return;
       return knex.schema.createTable("users", (t) => {
@@ -99,19 +124,29 @@ exports.up = function (knex) {
     }),
     knex.schema.hasTable("user_roles").then((exists) => {
       if (exists) return;
-      return knex.schema.createTable("user_roles", (t) => {
-        t.integer("user_id")
-          .references("users.id")
-          .onUpdate("CASCADE")
-          .onDelete("CASCADE");
-        t.integer("role_id")
-          .references("roles.id")
-          .onUpdate("CASCADE")
-          .onDelete("CASCADE");
-        t.enum("assigned_by", ["site", "discord"]).defaultTo("site");
-      });
+      return knex.schema
+        .createTable("user_roles", (t) => {
+          t.integer("user_id")
+            .references("users.id")
+            .onUpdate("CASCADE")
+            .onDelete("CASCADE");
+          t.integer("role_id")
+            .references("roles.id")
+            .onUpdate("CASCADE")
+            .onDelete("CASCADE");
+          t.enum("assigned_by", ["site", "discord", "roster"]).defaultTo(
+            "site"
+          );
+        })
+        .then(() => knex.raw(CREATE_TRIGGER));
     }),
 
+    // knex.raw(`CREATE RULE check_user_roles_for_duplicates AS ON INSERT TO user_roles
+    // WHERE NOT user_id = NEW.user_id AND WHERE NOT role_id = NEW.role_id
+    // DO INSERT INTO user_roles VALUES (NEW.role_id, NEW.user_id, assigned_by)`),
+    // knex.raw(
+    //   `CREATE RULE check_user_roles_for_duplicates AS ON INSERT TO user_roles WHERE user_id = NEW.user_id AND WHERE role_id = NEW.role_id DO NOTHING`
+    // ),
     knex.schema.hasTable("user_policies").then((exists) => {
       if (exists) return;
       return knex.schema.createTable("user_policies", (t) => {
@@ -311,16 +346,13 @@ exports.up = function (knex) {
       return knex.schema.createTable("rosters", (t) => {
         t.uuid("id").primary();
         t.string("name").unique();
+        t.string("url").unique();
         t.string("banner").nullable();
         t.string("icon").nullable();
         t.boolean("enable_recruitment").defaultTo(false);
         t.boolean("apply_roles_on_approval").defaultTo(false);
         t.boolean("private").defaultTo(false);
         t.boolean("auto_approve").defaultTo(false);
-        // t.integer("roster_form")
-        //   .references("forms.id")
-        //   .onDelete("CASCADE")
-        //   .onUpdate("CASCADE");
         t.integer("creator_id")
           .references("users.id")
           .onDelete("CASCADE")
@@ -348,7 +380,7 @@ exports.up = function (knex) {
           "rejected",
           "removed",
         ]).defaultTo("pending");
-        // t.boolean("approved").defaultTo(false);
+        t.boolean("is_deletable").defaultTo(true);
         t.uuid("roster_rank_id").references("roster_ranks.id");
         t.timestamp("approved_on");
         t.timestamps();
@@ -364,6 +396,7 @@ exports.up = function (knex) {
           .onUpdate("CASCADE");
         t.boolean("can_add_members").default(false);
         t.boolean("can_edit_members").default(false);
+        t.boolean("can_edit_member_ranks").default(false);
         t.boolean("can_add_ranks").default(false);
         t.boolean("can_edit_ranks").default(false);
         t.boolean("can_remove_ranks").default(false);
@@ -382,9 +415,9 @@ exports.up = function (knex) {
           .onUpdate("CASCADE");
         t.string("name");
         t.string("icon");
-        t.boolean("priority").defaultTo(false);
+        t.integer("priority").defaultTo(5);
         t.boolean("is_deletable").defaultTo(true);
-        t.boolean("is_disabled").defaultTo(false);
+        t.boolean("is_recruit").defaultTo(false);
         t.timestamps();
       });
     }),
@@ -411,6 +444,7 @@ exports.up = function (knex) {
           .onUpdate("CASCADE");
         t.boolean("can_add_members").default(false);
         t.boolean("can_edit_members").default(false);
+        t.boolean("can_edit_member_ranks").default(false);
         t.boolean("can_remove_members").default(false);
         t.boolean("can_add_ranks").default(false);
         t.boolean("can_edit_ranks").default(false);
@@ -542,22 +576,40 @@ exports.up = function (knex) {
           .onUpdate("CASCADE");
       });
     }),
+    // knex.schema.raw(
+    //   `CREATE OR REPLACE RULE check_user_role_duplicates AS ON INSERT TO user_roles WHERE EXISTS (SELECT 1 FROM user_roles WHERE user_roles.user_id = NEW.user_id AND WHERE user_roles.role_id = NEW.role_id) DO INSTEAD NOTHING`
+    // ),
   ]);
 };
 
 exports.down = async function (knex) {
-  try {
-    await knex.raw(
+  return Promise.all([
+    knex.raw(
       `DROP TABLE IF EXISTS rosters, roster_forms, roster_member_permissions, roster_permissions, roster_members, 
-      roster_ranks, roster_roles, media_share, user_form_fields,
-      user_forms, user_sessions, user_policies, form_fields, fields, 
-      forms, menu_tree, menu, event_participants, 
-      event_roles, event_meta, events, categories, 
-      user_roles, role_maps, discord_roles, role_policies, policies, post_types,
-      users, roles, media, posts, testimonies, tags,
-      settings, front_page_info`
-    );
-  } catch (err) {
-    throw err;
-  }
+    roster_ranks, roster_roles, media_share, user_form_fields,
+    user_forms, user_sessions, user_policies, form_fields, fields, 
+    forms, menu_tree, menu, event_participants, 
+    event_roles, event_meta, events, categories, 
+    user_roles, role_maps, discord_roles, role_policies, policies, post_types,
+    users, roles, media, posts, testimonies, tags,
+    settings, front_page_info`
+    ),
+    knex.raw(DROP_BEFORE_INSERT),
+  ]);
+
+  // try {
+  //   await knex.raw(DROP_BEFORE_INSERT),
+  //   await knex.raw(
+  //     `DROP TABLE IF EXISTS rosters, roster_forms, roster_member_permissions, roster_permissions, roster_members,
+  //     roster_ranks, roster_roles, media_share, user_form_fields,
+  //     user_forms, user_sessions, user_policies, form_fields, fields,
+  //     forms, menu_tree, menu, event_participants,
+  //     event_roles, event_meta, events, categories,
+  //     user_roles, role_maps, discord_roles, role_policies, policies, post_types,
+  //     users, roles, media, posts, testimonies, tags,
+  //     settings, front_page_info`
+  //   );
+  // } catch (err) {
+  //   throw err;
+  // }
 };

@@ -1,12 +1,15 @@
 "use strict";
 const Roster = require("$models/Roster");
+const RosterMember = require("$models/RosterMember");
 const guard = require("express-jwt-permissions")();
 const sanitize = require("sanitize-html");
+const hasScope = require("$util/hasScope");
 const { body, param } = require("express-validator");
 const { validate } = require("$util");
-const { transaction } = require("objection");
 const { VIEW_ALL_ADMIN } = require("$util/policies");
 const pick = require("lodash.pick");
+
+const isUndefined = (v) => v === undefined;
 
 const validators = validate([
   param("id")
@@ -36,33 +39,62 @@ const validators = validate([
 const generateGraph = (rosterId, body) => {
   const results = { id: rosterId };
 
-  if (body.enable_recruitment !== undefined) {
+  if (!isUndefined(body.enable_recruitment)) {
     Object.assign(results, { enable_recruitment: body.enable_recruitment });
   }
 
-  if (body.apply_roles_on_approval !== undefined) {
+  if (!isUndefined(body.auto_approve)) {
+    Object.assign(results, { auto_approve: body.auto_approve });
+  }
+
+  if (!isUndefined(body.apply_roles_on_approval)) {
     Object.assign(results, {
       apply_roles_on_approval: body.apply_roles_on_approval,
     });
   }
 
-  if (body.private !== undefined) {
+  if (!isUndefined(body.private)) {
     Object.assign(results, { private: body.private });
   }
 
-  if (body.is_disabled !== undefined) {
+  if (!isUndefined(body.is_disabled)) {
     Object.assign(results, { is_disabled: body.is_disabled });
   }
 
-  if (body.selectedForm) {
+  if (!isUndefined(body.selectedForm)) {
     Object.assign(results, { roster_form: { id: body.selectedForm } });
   }
 
-  if (body.roles) {
+  if (body.roles && body.roles.length) {
     Object.assign(results, { roles: body.roles.map((id) => ({ id })) });
   }
 
   return results;
+};
+
+const checkPermissions = async function (req, res, next) {
+  if (hasScope(req.user, [VIEW_ALL_ADMIN])) {
+    return next();
+  }
+  const hasAccess = await RosterMember.query()
+    .joinRelated("rank.[permissions], permissions")
+    .where("roster_members.member_id", req.user.id)
+    .andWhere((qb) => {
+      qb.where("permissions.can_edit_roster_details", true).orWhere(
+        "rank:permissions.can_edit_roster_details",
+        true
+      );
+    })
+    .first();
+
+  if (!hasAccess) {
+    const err = new Error();
+    err.message = "Insufficient Permissions";
+    err.stautsCode = "403";
+    return next(err);
+  }
+
+  next();
 };
 
 const addRoster = async function (req, res, next) {
@@ -72,6 +104,7 @@ const addRoster = async function (req, res, next) {
     pick(req.body, [
       "icon",
       "banner",
+      "auto_approve",
       "enable_recruitment",
       "private",
       "apply_roles_on_approval",
@@ -82,24 +115,6 @@ const addRoster = async function (req, res, next) {
   const trx = await Roster.startTransaction();
 
   try {
-    // const roster = pick(
-    //   await Roster.query(trx).upsertGraph(data, {
-    //     noDelete: true,
-    //     unrelate: ["roles", "form"],
-    //     relate: ["roles", "form"],
-    //   }),
-    //   [
-    //     "id",
-    //     "name",
-    //     "icon",
-    //     "private",
-    //     "enable_recruitment",
-    //     "is_disabled",
-    //     "roles",
-    //     "form",
-    //   ]
-    // );
-
     const { id } = await Roster.query(trx).upsertGraph(data, {
       noDelete: true,
       unrelate: ["roles", "roster_form"],
@@ -139,7 +154,7 @@ module.exports = {
       console.log(req.body);
       next();
     },
-    guard.check([VIEW_ALL_ADMIN]),
+    checkPermissions,
     validators,
   ],
   handler: addRoster,

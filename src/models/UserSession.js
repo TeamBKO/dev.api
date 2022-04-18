@@ -51,12 +51,11 @@ class UserSession extends guid(dateMixin(Model)) {
     user,
     tokenData,
     trx,
-    refreshExpiresIn = 60 * 60 * 24 * 7
+    refreshExpiresIn = 60 * 60 * 24 * 1
   ) {
     const query = trx ? this.query(trx) : this.query();
 
     return query.insert({
-      // token_id: tokenData.jti,
       refresh_token_id: tokenData.refresh_jti,
       user_id: user.id,
       expires: addSeconds(Date.now(), refreshExpiresIn),

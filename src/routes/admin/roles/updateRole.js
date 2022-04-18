@@ -9,6 +9,7 @@ const { param, body } = require("express-validator");
 const { validate, shouldRevokeToken } = require("$util");
 const { VIEW_ALL_ADMIN, UPDATE_ALL_ROLES } = require("$util/policies");
 const { transaction, raw } = require("objection");
+const uniq = require("lodash.uniq");
 
 const validators = validate([
   param("id").isNumeric().toInt(10),
@@ -56,7 +57,6 @@ const updateRole = async (req, res, next) => {
     await trx.commit();
 
     if (shouldRevokeToken(req)) {
-      console.log("Revoke");
       const sessions = await getUserSessionsByRoleID(req.params.id);
       if (sessions && sessions.length) {
         console.log(sessions);
@@ -67,7 +67,9 @@ const updateRole = async (req, res, next) => {
 
     const role = await query
       .where("id", req.params.id)
-      .select([...Object.keys(req.body.details), "id", "updated_at"])
+      .select(
+        uniq(["name", "id", "updated_at", ...Object.keys(req.body.details)])
+      )
       .first();
 
     console.log(role);

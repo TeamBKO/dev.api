@@ -1,36 +1,36 @@
 "use strict";
-const UserForm = require("$models/UserForm");
 const RosterRank = require("$models/RosterRank");
 const RosterMember = require("$models/RosterMember");
-const guard = require("express-jwt-permissions")();
+const User = require("$models/User");
+const Roster = require("$models/Roster");
 const sanitize = require("sanitize-html");
-const { body } = require("express-validator");
+const pick = require("lodash.pick");
+const { body, param } = require("express-validator");
 const { validate } = require("$util");
-const verifyRecaptcha = require("$services/recaptcha")(
-  process.env.RECAPTCHA_SECRET
-);
-const { ADD_OWN_FORMS, ADD_ALL_FORMS } = require("$util/policies");
 
 const validators = validate([
+  param("id")
+    .isUUID()
+    .trim()
+    .escape()
+    .customSanitizer((v) => sanitize(v)),
   body("form_id").isNumeric().toInt(10),
-  body("roster_id").isUUID(),
-  body("fields.*.id").isNumeric().toInt(10),
-  // body("fields.*.value")
-  //   .isString()
+  // body("roster_id")
+  //   .isUUID()
   //   .trim()
   //   .escape()
   //   .customSanitizer((v) => sanitize(v)),
-  // body("gresponse").isString().escape().trim(),
+  body("fields.*.id").isNumeric().toInt(10),
 ]);
 
-const insertFn = (form_id, roster_id, member_id, rank_id, fields) => {
+const insertFn = (member_id, form_id, roster_id, rank_id, fields) => {
   const result = {
     roster_id,
     member_id,
     roster_rank_id: rank_id,
-    form: {
-      form_id: form_id,
-    },
+    // form: {
+    //   form_id: form_id,
+    // },
     permissions: {
       can_add_members: false,
       can_edit_members: false,
@@ -43,7 +43,12 @@ const insertFn = (form_id, roster_id, member_id, rank_id, fields) => {
     },
   };
 
+  if (form_id) {
+    Object.assign(result, { form: { form_id } });
+  }
+
   if (fields && fields.length) {
+    if (!result.form) result.form = {};
     Object.assign(result.form, {
       form_fields: fields.map((field) => {
         return {
@@ -58,42 +63,92 @@ const insertFn = (form_id, roster_id, member_id, rank_id, fields) => {
 };
 
 const addRosterApplicant = async function (req, res, next) {
-  const { form_id, roster_id, fields } = req.body;
+  const { form_id, fields } = req.body;
 
   const options = {
     relate: ["rank", "form", "form.form_fields", "permissions"],
   };
 
-  const userAlreadySubmitted = await RosterMember.query()
-    .where("roster_id", roster_id)
-    .andWhere("member_id", req.user.id)
-    .andWhere((qb) => {
-      qb.where("status", "pending").orWhere("status", "approved");
-    })
+  const settings = await Roster.query()
+    .withGraphFetched("roles")
+    .select(["auto_approve", "apply_roles_on_approval"])
     .first();
 
-  if (userAlreadySubmitted) {
-    const message =
-      "You've already submitted an application for this category. Please wait for review and a response";
-    return res.status(422).send({
-      message,
-    });
+  if (!req.query.edit) {
+    const userAlreadySubmitted = await RosterMember.query()
+      .where("roster_id", req.params.id)
+      .andWhere("member_id", req.user.id)
+      // .andWhere((qb) => {
+      //   qb.where("status", "pending").orWhere("status", "approved");
+      // })
+      .first();
+
+    if (userAlreadySubmitted) {
+      const message =
+        "You've already applied to this roster. Please wait for review and a response";
+      return res.status(203).send({
+        message,
+      });
+    }
   }
 
   const rank = await RosterRank.query()
     .select("id")
-    .where("name", "Recruit")
-    .andWhere("roster_id", roster_id)
+    .where("is_recruit", true)
+    .andWhere("roster_id", req.params.id)
     .first();
 
-  const insert = insertFn(form_id, roster_id, req.user.id, rank.id, fields);
+  let insert = insertFn(req.user.id, form_id, req.params.id, rank.id, fields);
+
+  if (settings.auto_approve) {
+    Object.assign(insert, {
+      status: "approved",
+      approved_on: new Date().toISOString(),
+    });
+  }
 
   const trx = await RosterMember.startTransaction();
 
   try {
-    await RosterMember.query(trx).upsertGraph(insert, options);
+    const member = pick(
+      await RosterMember.query(trx)
+        .upsertGraph(insert, options)
+        .returning("id", "status"),
+      ["id", "status"]
+    );
+
+    if (
+      settings.auto_approve &&
+      settings.apply_roles_on_approval &&
+      settings.roles &&
+      settings.roles.length
+    ) {
+      const rolesToRelate = settings.roles.map((role) => role.id);
+
+      await User.relatedQuery("roles", trx)
+        .for(req.user.id)
+        .relate(rolesToRelate);
+    }
     await trx.commit();
-    res.sendStatus(204);
+
+    const roster = await Roster.query().select(
+      "id",
+      "name",
+      RosterMember.query()
+        .whereColumn("roster_members.roster_id", "rosters.id")
+        .count()
+        .as("members"),
+      RosterMember.query()
+        .whereColumn("roster_members.roster_id", "rosters.id")
+        .andWhere("member_id", req.user.id)
+        .count()
+        .as("joined")
+    );
+
+    console.log("roster", roster);
+    console.log("member", member);
+
+    res.status(200).send({ roster, member });
   } catch (err) {
     console.log(err);
     await trx.rollback();
@@ -102,10 +157,9 @@ const addRosterApplicant = async function (req, res, next) {
 };
 
 module.exports = {
-  path: "/",
+  path: "/:id",
   method: "POST",
   middleware: [
-    guard.check([[ADD_OWN_FORMS], [ADD_ALL_FORMS]]),
     (req, res, next) => {
       console.log(req.body);
       next();

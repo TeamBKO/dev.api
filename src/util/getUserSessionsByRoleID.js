@@ -5,8 +5,9 @@ const { raw } = require("objection");
 
 /**
  * Creates array of potentially blacklisted user tokens that need to be revoked.
- * @param {*} id The id referencing the user role
- * @param {*} trx The optional transaction object
+ * @param {*} id The id referencing the user role.
+ * @param {*} trx The optional transaction object.
+ * @return {array} Returns array of black listed tokens.
  */
 
 module.exports = async function getUserBlacklistByRoleID(id, trx) {
@@ -36,8 +37,6 @@ module.exports = async function getUserBlacklistByRoleID(id, trx) {
       return output;
     }, []);
   }
-
-  console.log(blacklist);
 
   return blacklist;
 };

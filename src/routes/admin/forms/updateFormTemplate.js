@@ -1,6 +1,7 @@
 "use strict";
 const Form = require("$models/Form");
 const Field = require("$models/Field");
+const uniq = require("lodash.uniq");
 const sanitize = require("sanitize-html");
 const guard = require("express-jwt-permissions")();
 const redis = require("$services/redis");
@@ -82,6 +83,8 @@ const upsert = (id, details, fields) => {
 const updateForm = async function (req, res, next) {
   const { details, fields } = req.body;
 
+  console.log(req.body);
+
   const up = upsert(req.params.id, details, fields);
   const trx = await Form.startTransaction();
 
@@ -92,9 +95,11 @@ const updateForm = async function (req, res, next) {
 
     await trx.commit();
 
+    const additional = details ? Object.keys(details) : [];
+
     const form = await Form.query()
       .where("id", id)
-      .select(uniq(["name", ...Object.keys(details)]))
+      .select(uniq(["name", ...additional]))
       .first();
 
     res.status(200).send(form);
@@ -102,35 +107,6 @@ const updateForm = async function (req, res, next) {
     console.log(err);
     next(err);
   }
-
-  // const form = await Form.transaction(async (trx) => {
-  //   let result = await Form.query(trx).upsertGraph(up).first().returning("*");
-
-  //   if (remove && remove.length) {
-  //     await Field.query(trx).whereIn("id", remove).del().returning("*");
-  //     if (!details && !added && !update) {
-  //       result = await Form.query(trx)
-  //         .patch({
-  //           updated_at: new Date().toISOString(),
-  //         })
-  //         .returning("*");
-  //     }
-  //   }
-
-  //   await redis.del(`form_${req.params.id}`);
-
-  //   // return pick(result, [
-  //   //   "name",
-  //   //   "status",
-  //   //   "category",
-  //   //   "created_at",
-  //   //   "updated_at",
-  //   // ]);
-
-  //   return result;
-  // });
-
-  res.status(200).send(form);
 };
 
 module.exports = {

@@ -116,7 +116,7 @@ const generateUsers = async (num) => {
   const salted = await bcrypt.genSalt(SALT);
   const hashed = await bcrypt.hash("superadminbko", salted);
 
-  for (let i = 0; i < num; i++) {
+  for (let i = 0; i <= num; i++) {
     const roles = [];
     const roleNum = blaver.datatype.number({ min: 1, max: 4 });
 

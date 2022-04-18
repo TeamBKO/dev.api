@@ -1,5 +1,6 @@
 "use strict";
 const { Model } = require("objection");
+
 const cursor = require("objection-cursor")({
   pageInfo: {
     hasMore: true,
@@ -17,9 +18,14 @@ class RosterMemberPermission extends guid(Model) {
     return {
       default(qb) {
         qb.select([
+          "id",
           "can_add_members",
           "can_edit_members",
+          "can_edit_member_ranks",
           "can_remove_members",
+          "can_add_ranks",
+          "can_edit_ranks",
+          "can_remove_ranks",
           "can_edit_roster_details",
           "can_delete_roster",
         ]);
@@ -34,7 +40,11 @@ class RosterMemberPermission extends guid(Model) {
         id: { type: "string" },
         can_add_members: { type: "boolean" },
         can_edit_members: { type: "boolean" },
+        can_edit_member_ranks: { type: "boolean" },
         can_remove_members: { type: "boolean" },
+        can_add_ranks: { type: "boolean" },
+        can_edit_ranks: { type: "boolean" },
+        can_remove_ranks: { type: "boolean" },
         can_edit_roster_details: { type: "boolean" },
         can_delete_roster: { type: "boolean" },
       },
@@ -50,7 +60,7 @@ class RosterMember extends cursor(guid(dates(Model))) {
   static get modifiers() {
     return {
       default(qb) {
-        qb.select("id", "status", "approved_on");
+        qb.select("id", "status", "approved_on", "is_deletable");
       },
     };
   }
@@ -59,7 +69,16 @@ class RosterMember extends cursor(guid(dates(Model))) {
     const User = require("$models/User");
     const RosterRank = require("$models/RosterRank");
     const UserForm = require("$models/UserForm");
+    const Roster = require("$models/Roster");
     return {
+      roster: {
+        relation: Model.BelongsToOneRelation,
+        modelClass: Roster,
+        join: {
+          from: "roster_members.roster_id",
+          to: "rosters.id",
+        },
+      },
       rank: {
         relation: Model.BelongsToOneRelation,
         modelClass: RosterRank,
@@ -93,7 +112,11 @@ class RosterMember extends cursor(guid(dates(Model))) {
           extra: [
             "can_add_members",
             "can_edit_members",
+            "can_edit_member_ranks",
             "can_remove_members",
+            "can_add_ranks",
+            "can_edit_ranks",
+            "can_remove_ranks",
             "can_edit_roster_details",
             "can_delete_roster",
           ],

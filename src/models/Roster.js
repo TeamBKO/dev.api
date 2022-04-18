@@ -14,6 +14,12 @@ class Roster extends cursor(guid(dateMixin(Model))) {
     return "rosters";
   }
 
+  static get modifiers() {
+    return {
+      default: (qb) => qb.select("id", "name", "icon", "banner"),
+    };
+  }
+
   static get jsonSchema() {
     return {
       type: "object",
@@ -22,10 +28,13 @@ class Roster extends cursor(guid(dateMixin(Model))) {
         id: { type: "string" },
         name: { type: "string" },
         icon: { type: "string" },
+        banner: { type: "string" },
         private: { type: "boolean" },
+        auto_approve: { type: "boolean" },
         apply_roles_on_approval: { type: "boolean" },
         enable_recruitment: { type: "boolean" },
         creator_id: { type: "integer" },
+        is_deleted: { type: "boolean" },
         is_disabled: { type: "integer" },
         created_at: { type: "date" },
         updated_at: { type: "date" },

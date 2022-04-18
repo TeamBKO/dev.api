@@ -4,18 +4,7 @@ const UnauthorizedError = require("express-jwt/lib/errors/UnauthorizedError");
 const generateTokenData = require("$util/generateTokenData");
 const jwt = require("jsonwebtoken");
 const redis = require("$services/redis");
-const { body } = require("express-validator");
-const { validate } = require("$util");
 const { raw } = require("objection");
-
-const validators = validate([
-  body("refresh_token").custom((v, { req }) => {
-    if (!"^[A-Za-z0-9-_=]+\\.[A-Za-z0-9-_=]+\\.[A-Za-z0-9-_.+/=]*$".test(v)) {
-      throw new Error("Malformed refresh token.");
-    }
-    return true;
-  }),
-]);
 
 const select = ["users.id", "users.username", "users.discord_id"];
 
@@ -68,6 +57,5 @@ const refreshToken = async (req, res, next) => {
 module.exports = {
   path: "/refresh",
   method: "POST",
-  // middleware: [validators],
   handler: refreshToken,
 };

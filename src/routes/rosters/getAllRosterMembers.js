@@ -32,6 +32,7 @@ const select = [
   "roster_members.id",
   "roster_members.status",
   "roster_members.approved_on",
+  "roster_members.is_deletable",
   "member.username as username",
   "member.avatar as avatar",
 ];
@@ -49,7 +50,9 @@ const getRosterMembers = async function (req, res, next) {
       .joinRelated("[member(defaultSelects)]")
       .select(select)
       .where("roster_members.roster_id", req.params.id)
-      .withGraphFetched("[rank, form(default)]"),
+      .withGraphFetched("[rank, form(default)]")
+      .orderBy("roster_members.roster_rank_id", "asc")
+      .orderBy("roster_members.id"),
     filters,
     "roster_members"
   );

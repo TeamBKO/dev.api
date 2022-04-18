@@ -19,7 +19,9 @@ const select = [
   "id",
   "name",
   "icon",
+  "banner",
   "enable_recruitment",
+  "auto_approve",
   "apply_roles_on_approval",
   "private",
   "is_disabled",
@@ -27,7 +29,7 @@ const select = [
   "updated_at",
 ];
 
-const getRostier = async function (req, res, next) {
+const getRoster = async function (req, res, next) {
   const roster = await Roster.query()
     .withGraphFetched("[roster_form, roles]")
     .select(select)
@@ -47,5 +49,5 @@ module.exports = {
     guard.check([VIEW_ALL_ADMIN]),
     validators,
   ],
-  handler: getRostier,
+  handler: getRoster,
 };

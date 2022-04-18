@@ -1,60 +1,73 @@
 "use strict";
-
 const Roster = require("$models/Roster");
 const RosterMember = require("$models/RosterMember");
-
-const guard = require("express-jwt-permissions")();
+const getCache = require("$util/getCache");
 const sanitize = require("sanitize-html");
-const filterQuery = require("$util/filterQuery");
+
 const { param } = require("express-validator");
 const { validate } = require("$util");
-const { transaction } = require("objection");
-const { VIEW_ALL_ROSTERS } = require("$util/policies");
 
 const validators = validate([
-  param("id")
+  param("slug")
     .isString()
     .trim()
     .escape()
     .customSanitizer((v) => sanitize(v)),
 ]);
 
-const select = ["name", "icon", "enable_recruitment", "is_disabled", "private"];
+const select = [
+  "id",
+  "name",
+  "url",
+  "icon",
+  "banner",
+  "auto_approve",
+  "apply_roles_on_approval",
+  "enable_recruitment",
+  "is_disabled",
+  "private",
+];
+
+const memberSelect = [
+  "roster_members.id",
+  "roster_members.status",
+  "roster_members.approved_on",
+  "roster_members.is_deletable",
+  "member.username as username",
+  "member.avatar as avatar",
+  "member.id as userID",
+];
 
 const getRoster = async function (req, res, next) {
-  const rosterQuery = Roster.query()
-    .withGraphFetched("[creator(defaultSelects), ranks(default)]")
+  let roster = await Roster.query()
+    .withGraphFetched(
+      "[roster_form(default), ranks(default), roles(nameAndId)]"
+    )
     .select(select)
-    .where("id", req.params.id)
+    .where("url", req.params.slug)
+    .throwIfNotFound()
     .first();
 
   const membersQuery = RosterMember.query()
     .joinRelated("member(defaultSelects)")
-    .select([
-      "roster_members.id",
-      "roster_members.status",
-      "roster_members.approved_on",
-      "member.username as username",
-      "member.avatar as avatar",
-    ])
+    .select(memberSelect)
     .where("status", "approved")
-    .andWhere("roster_id", req.params.id)
+    .andWhere("roster_id", roster.id)
     .withGraphFetched("[rank(default), form(default)]")
+    .orderBy("roster_members.roster_rank_id", "asc")
+    .orderBy("roster_members.id")
     .limit(25)
     .cursorPage();
 
   const memberQuery = RosterMember.query()
+    // .joinRelated("member(defaultSelects")
     .withGraphFetched("[rank(default).[permissions(default)]]")
-    .select(["id"])
-    .where("roster_id", req.params.id)
+    .select(["id", "status"])
+    .where("roster_id", roster.id)
     .andWhere("member_id", req.user.id)
     .first();
 
-  let [roster, members, member] = await Promise.all([
-    rosterQuery,
-    membersQuery,
-    memberQuery,
-  ]);
+  let [members, member] = await Promise.all([membersQuery, memberQuery]);
 
   roster = Object.assign(roster, { members, member });
 
@@ -64,7 +77,7 @@ const getRoster = async function (req, res, next) {
 };
 
 module.exports = {
-  path: "/:id",
+  path: "/:slug",
   method: "GET",
   middleware: [
     (req, res, next) => {

@@ -6,13 +6,12 @@ const verifyRecaptcha = require("$services/recaptcha")(
   process.env.RECAPTCHA_SECRET
 );
 const redis = require("$services/redis");
-
+const sanitize = require("sanitize-html");
 const User = require("$models/User");
 const Settings = require("$models/Settings");
 
 const { body, header } = require("express-validator");
 const { validate } = require("$util");
-const { transaction } = require("objection");
 const { nanoid } = require("nanoid");
 
 const register = async function (req, res, next) {
@@ -77,10 +76,23 @@ module.exports = {
         .isAlphanumeric()
         .isLength({ min: 3, max: 30 })
         .trim()
-        .escape(),
-      body("email").notEmpty().isEmail(),
-      body("password").notEmpty().isLength({ min: 8, max: 50 }).trim().escape(),
-      body("gresponse").isString().escape().trim(),
+        .escape()
+        .customSanitizer((v) => sanitize(v)),
+      body("email")
+        .notEmpty()
+        .isEmail()
+        .customSanitizer((v) => sanitize(v)),
+      body("password")
+        .notEmpty()
+        .isLength({ min: 8, max: 50 })
+        .trim()
+        .escape()
+        .customSanitizer((v) => sanitize(v)),
+      body("gresponse")
+        .isString()
+        .escape()
+        .trim()
+        .customSanitizer((v) => sanitize(v)),
     ]),
     verifyRecaptcha,
   ],

@@ -1,15 +1,19 @@
 "use strict";
 const Roster = require("$models/Roster");
+const RosterMember = require("$models/RosterMember");
 const guard = require("express-jwt-permissions")();
 const sanitize = require("sanitize-html");
+const slugify = require("slugify");
 const { body } = require("express-validator");
 const { validate } = require("$util");
 const { transaction } = require("objection");
 const { VIEW_ALL_ADMIN } = require("$util/policies");
 
+const isUndefined = (v) => v === undefined;
+
 const validators = validate([
   body("name")
-    .isAlphanumeric()
+    .isString()
     .escape()
     .trim()
     .customSanitizer((v) => sanitize(v)),
@@ -20,6 +24,7 @@ const validators = validate([
     .trim()
     .customSanitizer((v) => sanitize(v)),
   body("enable_recruitment").optional().isBoolean(),
+  body("auto_approve").optional().isBoolean(),
   body("apply_roles_on_approval").optional().isBoolean(),
   body("private").optional().isBoolean(),
   body("is_disabled").optional().isBoolean(),
@@ -31,12 +36,14 @@ const generateGraph = (userId, body) => {
   const results = {
     "#id": "roster",
     name: body.name,
+    url: body.url,
     creator_id: userId,
     members: [
       {
         member_id: userId,
         status: "approved",
         approved_on: new Date().toISOString(),
+        is_deletable: false,
         permissions: {
           can_add_members: false,
           can_edit_members: false,
@@ -49,13 +56,16 @@ const generateGraph = (userId, body) => {
         },
         rank: {
           name: "Owner",
+          icon:
+            "https://lobucket.s3.ca-central-1.amazonaws.com/images/ranks/owner.png",
           roster_id: "#ref{roster.id}",
           is_deletable: false,
-          priority: true,
+          priority: 1,
           permissions: [
             {
               can_add_members: true,
               can_edit_members: true,
+              can_edit_member_ranks: true,
               can_remove_members: true,
               can_edit_roster_details: true,
               can_delete_roster: true,
@@ -70,10 +80,15 @@ const generateGraph = (userId, body) => {
     ranks: [
       {
         name: "Leader",
+        icon:
+          "https://lobucket.s3.ca-central-1.amazonaws.com/images/ranks/leader.png",
+        priority: 2,
+        is_deletable: false,
         permissions: [
           {
             can_add_members: true,
             can_edit_members: true,
+            can_edit_member_ranks: true,
             can_remove_members: true,
             can_edit_roster_details: true,
             can_delete_roster: false,
@@ -85,16 +100,24 @@ const generateGraph = (userId, body) => {
       },
       {
         name: "Officer",
+        icon:
+          "https://lobucket.s3.ca-central-1.amazonaws.com/images/ranks/officer.png",
+        priority: 3,
+        is_deletable: false,
         permissions: [
           {
             can_add_members: true,
             can_edit_members: true,
             can_remove_members: true,
+            can_edit_member_ranks: true,
           },
         ],
       },
       {
-        name: "Recruit",
+        name: "Member",
+        icon:
+          "https://lobucket.s3.ca-central-1.amazonaws.com/images/ranks/member.png",
+        priority: 4,
         is_deletable: false,
         permissions: [
           {
@@ -107,7 +130,12 @@ const generateGraph = (userId, body) => {
         ],
       },
       {
-        name: "Member",
+        name: "Recruit",
+        icon:
+          "https://lobucket.s3.ca-central-1.amazonaws.com/images/ranks/recruit.png",
+        priority: 5,
+        is_deletable: false,
+        is_recruit: true,
         permissions: [
           {
             can_add_members: false,
@@ -121,39 +149,61 @@ const generateGraph = (userId, body) => {
     ],
   };
 
-  if (typeof body.enable_recruitment !== undefined) {
+  if (body.icon) {
+    Object.assign(results, { icon: body.icon });
+  }
+
+  if (body.banner) {
+    Object.assign(results, { banner: body.banner });
+  } else {
+    Object.assign(results, {
+      banner:
+        "https://images.ctfassets.net/j95d1p8hsuun/1ShvIkEIe3cvb5qKSguLdC/9bbac0c4239985ca540650ec240d765b/HOME_USP1_FightTheWorld_CPB-L-1920x720.jpg",
+    });
+  }
+
+  if (!isUndefined(body.enable_recruitment)) {
     Object.assign(results, { enable_recruitment: body.enable_recruitment });
   }
 
-  if (typeof body.apply_roles_on_approval !== undefined) {
+  if (!isUndefined(body.auto_approve)) {
+    Object.assign(results, { auto_approve: body.auto_approve });
+  }
+
+  if (!isUndefined(body.apply_roles_on_approval)) {
     Object.assign(results, {
       apply_roles_on_approval: body.apply_roles_on_approval,
     });
   }
 
-  if (typeof body.private !== undefined) {
+  if (!isUndefined(body.private)) {
     Object.assign(results, { private: body.private });
   }
 
-  if (typeof body.is_disabled !== undefined) {
+  if (!isUndefined(body.is_disabled)) {
     Object.assign(results, { is_disabled: body.is_disabled });
   }
 
-  if (body.selectedForm) {
+  if (!isUndefined(body.selectedForm)) {
     Object.assign(results, { roster_form: { id: body.selectedForm } });
   }
 
   if (body.selectedRoles && body.selectedRoles.length) {
-    Object.assign(results, { roles: body.roles.map((id) => ({ id })) });
+    Object.assign(results, { roles: body.selectedRoles.map((id) => ({ id })) });
   }
 
   return results;
 };
 
-const select = [];
-
 const addRoster = async function (req, res, next) {
-  const data = generateGraph(req.user.id, req.body);
+  const body = req.body;
+
+  body.url = slugify(body.name, {
+    strict: true,
+    lower: true,
+  });
+
+  const data = generateGraph(req.user.id, body);
 
   const trx = await Roster.startTransaction();
 
@@ -171,6 +221,18 @@ const addRoster = async function (req, res, next) {
     await trx.commit();
 
     const roster = await Roster.query()
+      .select([
+        "*",
+        RosterMember.query()
+          .where("roster_members.member_id", req.user.id)
+          .whereColumn("roster_members.roster_id", "rosters.id")
+          .count()
+          .as("joined"),
+        RosterMember.query()
+          .whereColumn("roster_members.roster_id", "rosters.id")
+          .count()
+          .as("members"),
+      ])
       .withGraphFetched("[roster_form, creator(defaultSelects)]")
       .where("id", id)
       .first();
