@@ -9,14 +9,19 @@ const cursor = require("objection-cursor")({
 });
 const guid = require("$util/mixins/guid")();
 
-class UserForm extends cursor(guid(dateMixin(Model))) {
+class RosterForm extends cursor(guid(dateMixin(Model))) {
   static get tableName() {
-    return "user_forms";
+    return "roster_member_forms";
   }
 
   static get modifiers() {
     return {
       default: (qb) => qb.select("id"),
+      // useAsColumn: (qb) =>
+      //   qb
+      //     .withGraphJoined("fields")
+      //     .where("fields.use_as_column", true)
+      //     .select(["forms.id"]),
     };
   }
 
@@ -28,6 +33,7 @@ class UserForm extends cursor(guid(dateMixin(Model))) {
         id: { type: "string" },
         form_id: { type: "integer" },
         roster_member_id: { type: "string" },
+        roster_id: { type: "string" },
         // status: { type: "string" },
         created_at: { type: "string" },
         updated_at: { type: "string" },
@@ -36,17 +42,25 @@ class UserForm extends cursor(guid(dateMixin(Model))) {
   }
 
   static get relationMappings() {
-    const User = require("$models/User");
     const RosterMember = require("$models/RosterMember");
+    const Roster = require("$models/Roster");
     const Form = require("$models/Form");
-    const UserFormField = require("$models/UserFormField");
+    const RosterFormField = require("$models/RosterFormField");
     const Field = require("$models/Field");
     return {
+      roster: {
+        relation: Model.BelongsToOneRelation,
+        modelClass: Roster,
+        join: {
+          from: "roster_member_forms.roster_id",
+          to: "rosters.id",
+        },
+      },
       applicant: {
         relation: Model.BelongsToOneRelation,
         modelClass: RosterMember,
         join: {
-          from: "user_forms.roster_member_id",
+          from: "roster_member_forms.roster_member_id",
           to: "roster_members.id",
         },
       },
@@ -54,7 +68,7 @@ class UserForm extends cursor(guid(dateMixin(Model))) {
         relation: Model.HasOneRelation,
         modelClass: Form,
         join: {
-          from: "user_forms.form_id",
+          from: "roster_member_forms.form_id",
           to: "forms.id",
         },
       },
@@ -62,25 +76,25 @@ class UserForm extends cursor(guid(dateMixin(Model))) {
         relation: Model.ManyToManyRelation,
         modelClass: Field,
         join: {
-          from: "user_forms.id",
+          from: "roster_member_forms.id",
           through: {
-            from: "user_form_fields.form_id",
-            extra: ["answer"],
-            to: "user_form_fields.field_id",
+            from: "roster_form_fields.form_id",
+            extra: ["id", "answer"],
+            to: "roster_form_fields.field_id",
           },
           to: "fields.id",
         },
       },
       form_fields: {
         relation: Model.HasManyRelation,
-        modelClass: UserFormField,
+        modelClass: RosterFormField,
         join: {
-          from: "user_forms.id",
-          to: "user_form_fields.form_id",
+          from: "roster_member_forms.id",
+          to: "roster_form_fields.form_id",
         },
       },
     };
   }
 }
 
-module.exports = UserForm;
+module.exports = RosterForm;

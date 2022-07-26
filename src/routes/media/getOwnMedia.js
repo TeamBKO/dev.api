@@ -36,13 +36,8 @@ const getOwnMedia = async function (req, res, next) {
   const nextCursor = req.query.nextCursor;
   const filters = req.query.exclude;
 
-  const { enable_account_media_sharing } = await Settings.query()
-    .select("enable_account_media_sharing")
-    .first();
-
-  let query = filterQuery(
+  let mediaQuery = filterQuery(
     Media.query()
-      .joinRelated("media_shared_users")
       .select(select)
       .where("media.owner_id", req.user.id)
       .orderBy("media.id")
@@ -51,16 +46,23 @@ const getOwnMedia = async function (req, res, next) {
     filters
   );
 
-  if (enable_account_media_sharing) {
-    query = query.orWhere("media_shared_users.id", req.user.id);
-  }
-
   let media;
 
   if (nextCursor) {
-    media = await query.clone().cursorPage(nextCursor);
+    const next = nextCursor.split(".")[0];
+    media = await getCachedQuery(
+      `media:${req.user.id}:${next}`,
+      mediaQuery.clone().cursorPage(nextCursor),
+      settings.cache_media_on_fetch,
+      filters
+    );
   } else {
-    media = await query.clone().cursorPage();
+    media = await getCachedQuery(
+      `media:${req.user.id}:first`,
+      mediaQuery.clone().cursorPage(),
+      settings.cache_media_on_fetch,
+      filters
+    );
   }
 
   console.log(media);

@@ -25,6 +25,8 @@ const validators = validate([
   // body("fields.*.optional").isBoolean(),
   body("fields.*.value")
     .isString()
+    .notEmpty()
+    .withMessage("The question cannot be empty.")
     .trim()
     .escape()
     .customSanitizer((v) => sanitize(v)),

@@ -2,9 +2,11 @@
 const RosterRank = require("$models/RosterRank");
 const RosterMember = require("$models/RosterMember");
 const sanitize = require("sanitize-html");
+const redis = require("$services/redis");
 const pick = require("lodash.pick");
 const { param, body } = require("express-validator");
 const { validate } = require("$util");
+const { deleteCacheByPattern } = require("$services/redis/helpers");
 
 const validators = validate([
   param("id")
@@ -64,6 +66,7 @@ const upsertRosterRank = async function (req, res, next) {
   const rank = pick(req.body, ["name", "icon", "priority", "permissions"]);
   const { roster_id } = req.body;
   const hasAccess = await RosterMember.query()
+    .select("roster_id")
     .joinRelated("[permissions, rank.[permissions]]")
     .where("roster_members.member_id", req.user.id)
     .andWhere((qb) =>
@@ -111,6 +114,9 @@ const upsertRosterRank = async function (req, res, next) {
     });
 
     await trx.commit();
+
+    await redis.del(`roster:${hasAccess.roster_id}`);
+    deleteCacheByPattern(`members:${hasAccess.roster_id.split("-")[4]}:`);
 
     const result = await RosterRank.query()
       .select(select)

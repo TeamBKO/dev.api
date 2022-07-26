@@ -6,7 +6,7 @@ const redis = require("$services/redis");
 const pick = require("lodash.pick");
 const { body } = require("express-validator");
 const { validate } = require("$util");
-const { transaction } = require("objection");
+const { deleteKeysByPattern } = require("$services/redis/helpers");
 
 const validators = validate([
   body("name")
@@ -30,12 +30,10 @@ const addCategory = async function (req, res, next) {
 
   try {
     const category = await Category.query(trx).insert(data).returning("*");
-    const pipeline = redis.pipeline();
-    pipeline.del("categories");
-    pipeline.del("recruit_categories");
-    pipeline.del("form_categories");
-    pipeline.exec();
+
     await trx.commit();
+
+    deleteKeysByPattern("categories:");
 
     res.status(200).send(category);
   } catch (err) {

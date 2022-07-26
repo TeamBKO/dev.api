@@ -3,9 +3,11 @@ const Roster = require("$models/Roster");
 const RosterMember = require("$models/RosterMember");
 const guard = require("express-jwt-permissions")();
 const sanitize = require("sanitize-html");
+const redis = require("$services/redis");
 
 const { param } = require("express-validator");
 const { validate } = require("$util");
+const { deleteCacheByPattern } = require("$services/redis/helpers");
 
 const middleware = [
   validate([
@@ -19,7 +21,7 @@ const middleware = [
 
 const removeRoster = async function (req, res, next) {
   const hasAccess = await RosterMember.query()
-    .joinRelated("rank.[permissions], permissions")
+    .joinRelated("[permissions, rank.[permissions]]")
     .where("roster_members.member_id", req.user.id)
     .andWhere((qb) => {
       qb.where("permissions.can_delete_roster", true).orWhere(
@@ -40,11 +42,16 @@ const removeRoster = async function (req, res, next) {
       .where("id", req.params.id)
       .andWhere("is_deletable", true)
       .delete()
-      .returning(["id", "name"]);
+      .returning(["id", "name", "url"])
+      .throwIfNotFound();
 
     await trx.commit();
 
-    res.status(200).send(deleted);
+    await redis.del(`roster:${req.params.id}`);
+    deleteCacheByPattern(`members:${req.params.id}:`);
+    deleteCacheByPattern("rosters:");
+
+    await res.status(200).send(deleted);
   } catch (err) {
     await trx.rollback();
     next(err);

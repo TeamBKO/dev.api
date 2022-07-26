@@ -9,6 +9,24 @@ const cursor = require("objection-cursor")({
   },
 });
 
+class RosterColumn extends guid(Model) {
+  static get tableName() {
+    return "roster_table_columns";
+  }
+
+  static get jsonSchema() {
+    return {
+      type: "object",
+      required: ["roster_id", "column_name"],
+      properties: {
+        id: { type: "string" },
+        roster_id: { type: "string" },
+        column_name: { type: "string" },
+      },
+    };
+  }
+}
+
 class Roster extends cursor(guid(dateMixin(Model))) {
   static get tableName() {
     return "rosters";
@@ -31,6 +49,7 @@ class Roster extends cursor(guid(dateMixin(Model))) {
         banner: { type: "string" },
         private: { type: "boolean" },
         auto_approve: { type: "boolean" },
+        show_fields_as_columns: { type: "boolean" },
         apply_roles_on_approval: { type: "boolean" },
         enable_recruitment: { type: "boolean" },
         creator_id: { type: "integer" },
@@ -49,6 +68,14 @@ class Roster extends cursor(guid(dateMixin(Model))) {
     const RosterRank = require("$models/RosterRank");
     const RosterMember = require("$models/RosterMember");
     return {
+      columns: {
+        relation: Model.HasManyRelation,
+        modelClass: RosterColumn,
+        join: {
+          from: "rosters.id",
+          to: "roster_table_columns.roster_id",
+        },
+      },
       creator: {
         relation: Model.HasOneRelation,
         modelClass: User,

@@ -14,6 +14,9 @@ class Role extends cursor(dateMixin(Model)) {
 
   static get modifiers() {
     return {
+      default(builder) {
+        builder.select("id");
+      },
       nameAndId(builder) {
         builder.select("id", "name");
       },

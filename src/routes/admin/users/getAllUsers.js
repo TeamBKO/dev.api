@@ -4,6 +4,10 @@ const filterQuery = require("$util/filterQuery");
 const guard = require("express-jwt-permissions")();
 const { query } = require("express-validator");
 const { validate } = require("$util");
+const {
+  getCachedQuery,
+  getCachedSettings,
+} = require("$services/redis/helpers");
 const { VIEW_ALL_ADMIN, VIEW_ALL_USERS } = require("$util/policies");
 const pick = require("lodash.pick");
 
@@ -26,6 +30,8 @@ const getAllUsers = async function (req, res, next) {
     "active",
   ]);
 
+  const settings = await getCachedSettings();
+
   const roleIds = req.query["roles.id"];
 
   const userQuery = filterQuery(
@@ -47,9 +53,20 @@ const getAllUsers = async function (req, res, next) {
   let query;
 
   if (nextCursor) {
-    query = await userQuery.clone().cursorPage(nextCursor).debug();
+    const next = nextCursor.split(".")[0];
+    query = await getCachedQuery(
+      `users:${next}`,
+      userQuery.clone().cursorPage(nextCursor),
+      settings.cache_users_on_fetch,
+      filters
+    );
   } else {
-    query = await userQuery.clone().cursorPage().debug();
+    query = await getCachedQuery(
+      "users:first",
+      userQuery.clone().cursorPage(),
+      settings.cache_users_on_fetch,
+      filters
+    );
   }
 
   console.log(query.results.length);

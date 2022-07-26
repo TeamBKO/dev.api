@@ -2,9 +2,11 @@
 const Tag = require("$models/Tag");
 const guard = require("express-jwt-permissions")();
 const sanitize = require("sanitize-html");
+const redis = require("$services/redis");
+
 const { body, param } = require("express-validator");
 const { validate } = require("$util");
-const { transaction } = require("objection");
+const { deleteCacheByPattern } = require("$services/redis/helpers");
 const { VIEW_ALL_ADMIN, UPDATE_ALL_TAGS } = require("$util/policies");
 
 const validators = validate([
@@ -34,6 +36,8 @@ const editTag = async function (req, res, next) {
       .returning("id", "name", "updated_at");
 
     await trx.commit();
+    await redis.del(`tag:${req.params.id}`);
+    deleteCacheByPattern("tags:");
     res.status(200).send(tag);
   } catch (err) {
     console.error(err);

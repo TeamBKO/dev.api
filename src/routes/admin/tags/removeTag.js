@@ -1,7 +1,8 @@
 "use strict";
 const Tag = require("$models/Tag");
 const guard = require("express-jwt-permissions")();
-const { query, param } = require("express-validator");
+const { deleteCacheByPattern } = require("$services/redis/helpers");
+const { query } = require("express-validator");
 const { validate } = require("$util");
 const { transaction } = require("objection");
 const { VIEW_ALL_ADMIN } = require("$util/policies");
@@ -16,6 +17,8 @@ const removeTag = async function (req, res, next) {
       .whereIn("id", req.query.ids)
       .delete()
       .returning("id");
+
+    deleteCacheByPattern("tags:");
 
     res.status(200).send(deleted);
   } catch (err) {

@@ -1,15 +1,17 @@
 "use strict";
 const Role = require("$models/Role");
-const DiscordRole = require("$models/DiscordRole");
-const Settings = require("$models/Settings");
-const Policy = require("$models/Policy");
+
 const guard = require("express-jwt-permissions")();
-const getCache = require("$util/getCache");
+const pick = require("lodash.pick");
+
 const filterQuery = require("$util/filterQuery");
 const { query } = require("express-validator");
 const { validate } = require("$util");
 const { VIEW_ALL_ADMIN, VIEW_ALL_ROLES } = require("$util/policies");
-const pick = require("lodash.pick");
+const {
+  getCachedSettings,
+  getCachedQuery,
+} = require("$services/redis/helpers");
 
 const select = [
   "id",
@@ -24,6 +26,8 @@ const select = [
 const getAllRoles = async function (req, res, next) {
   const nextCursor = req.query.nextCursor;
   const filters = pick(req.query, ["limit", "exclude", "id"]);
+
+  const settings = await getCachedSettings();
 
   const roleQuery = filterQuery(
     Role.query()
@@ -43,9 +47,20 @@ const getAllRoles = async function (req, res, next) {
   let query = null;
 
   if (nextCursor) {
-    query = await roleQuery.clone().cursorPage(nextCursor);
+    const next = nextCursor.split(".")[0];
+    query = await getCachedQuery(
+      `roles:${next}`,
+      roleQuery.clone().cursorPage(nextCursor),
+      settings.cache_roles_on_fetch,
+      filters
+    );
   } else {
-    query = await roleQuery.clone().cursorPage();
+    query = await getCachedQuery(
+      "roles:first",
+      roleQuery.clone().cursorPage(),
+      settings.cache_roles_on_fetch,
+      filters
+    );
   }
 
   // Object.assign(response, { roles: query });

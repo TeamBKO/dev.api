@@ -25,6 +25,11 @@ const select = [
   "apply_roles_on_approval",
   "private",
   "is_disabled",
+  "assign_discord_roles_on_approval",
+  "approved_applicant_channel_id",
+  "pending_applicant_channel_id",
+  "rejected_applicant_channel_id",
+  "display_applicant_forms_on_discord",
   "created_at",
   "updated_at",
 ];

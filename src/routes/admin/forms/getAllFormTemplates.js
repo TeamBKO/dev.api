@@ -1,7 +1,5 @@
 "use strict";
 const Form = require("$models/Form");
-const Category = require("$models/Category");
-const getCache = require("$util/getCache");
 const guard = require("express-jwt-permissions")();
 const sanitize = require("sanitize-html");
 const filterQuery = require("$util/filterQuery");

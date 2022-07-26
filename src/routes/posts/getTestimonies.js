@@ -3,23 +3,23 @@ const Testimony = require("$models/Testimony");
 const { query } = require("express-validator");
 const { validate } = require("$util");
 
-const columns = ["id", "avatar", "username"];
+const columns = ["id", "author", "avatar", "text"];
 
 const getTestimonies = async function (req, res) {
-  const prevCursor = req.query.prevCursor,
-    nextCursor = req.query.nextCursor;
+  const prevCursor = req.query.previous,
+    nextCursor = req.query.next;
 
   const testimonies = Testimony.query()
-    .orderBy("order", "asc")
+    .orderBy("id")
     .select(columns)
-    .limit(req.query.limit || 10);
+    .limit(req.query.limit || 8);
 
   let query;
 
   if (nextCursor) {
     query = await testimonies.clone().cursorPage(nextCursor);
   } else if (prevCursor) {
-    query = await testimonies.clone().cursorPage(prevCursor);
+    query = await testimonies.clone().previousCursorPage(prevCursor);
   } else {
     query = await testimonies.clone().cursorPage();
   }
@@ -30,7 +30,7 @@ const getTestimonies = async function (req, res) {
 };
 
 module.exports = {
-  path: "/",
+  path: "/testimonies",
   method: "GET",
   middleware: [
     validate([query("nextCursor").optional().isString().escape().trim()]),

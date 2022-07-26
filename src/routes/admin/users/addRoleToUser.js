@@ -6,7 +6,7 @@ const redis = require("$services/redis");
 const { param, body } = require("express-validator");
 const { validate } = require("$util");
 const { VIEW_ALL_ADMIN, UPDATE_ALL_USERS } = require("$util/policies");
-const { transaction } = require("objection");
+const { deleteCacheByPattern } = require("$services/redis/helpers");
 
 const addRoleToUser = async function (req, res, next) {
   const userId = req.params.id,
@@ -39,8 +39,9 @@ const addRoleToUser = async function (req, res, next) {
     }
 
     await trx.commit();
-    await redis.del(`user_${userId}`);
-    await redis.del(`me_${userId}`);
+    deleteCacheByPattern("users:");
+    await redis.del(`user:${userId}`);
+    await redis.del(`me:${userId}`);
 
     const payload = {
       user_id: user.user_id,

@@ -18,27 +18,15 @@ const resend = async function (req, res, next) {
       .select("last_activation_email_sent")
       .where({ id: req.body.id, active: false })
       .first(),
-    Settings.query().select("user_activation_request_ttl_in_minutes").first(),
+    Settings.query().select("universal_request_ttl_in_minutes").first(),
   ]);
-
-  // const timeTillNextEmail = addMinutes(
-  //   account.last_password_email_sent,
-  //   settings.user_activation_request_ttl_in_minutes
-  // );
-
-  // const time = subSeconds(
-  //   timeTillNextEmail,
-  //   differenceInSeconds(timeTillNextEmail, new Date())
-  // );
 
   const nextRequestAvailable = getCountTillNextRequest(
     account.last_activation_email_sent,
-    settings.user_activation_request_ttl_in_minutes
+    settings.universal_request_ttl_in_minutes
   );
 
   if (nextRequestAvailable.endTime) {
-    console.log("Testing....");
-
     return res.status(200).send({
       status: 1,
       resend: true,
@@ -47,11 +35,10 @@ const resend = async function (req, res, next) {
     });
   }
 
-  const trx = await User.startTransaction();
-
   const code = nanoid(32);
 
-  const expiry = settings.user_activation_request_ttl_in_minutes * 60;
+  const expiry = settings.universal_request_ttl_in_minutes * 60;
+  const trx = await User.startTransaction();
 
   try {
     const user = await User.query(trx)
@@ -61,9 +48,9 @@ const resend = async function (req, res, next) {
       .first()
       .throwIfNotFound();
 
-    await redis.set(req.body.id, code, "NX", "EX", expiry);
+    await redis.set(`activation:${req.body.id}`, code, "NX", "EX", expiry);
 
-    await sendEmail(user.email, "USER_REGISTERATION", {
+    await sendEmail(user.email, "USER_REGISTRATION", {
       url: process.env.BASE_URL + "activation",
       id: user.id,
       code,
@@ -77,7 +64,7 @@ const resend = async function (req, res, next) {
       message: "An email has been dispatched.",
       ...getCountTillNextRequest(
         user.last_activation_email_sent,
-        settings.user_activation_request_ttl_in_minutes
+        settings.universal_request_ttl_in_minutes
       ),
     });
   } catch (err) {

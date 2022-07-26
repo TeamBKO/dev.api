@@ -59,10 +59,11 @@ const bootstrapApp = async () => {
         `${apiVersion}/auth/logout`,
         `${apiVersion}/users/register`,
         `${apiVersion}/users/activation`,
+        `${apiVersion}/posts/testimonies`,
         /^\/api\/users\/password-reset(?:\/([^\/]+?))?\/?$/i,
         `${apiVersion}/users/resend/activation`,
         `${apiVersion}/social/discord/link`,
-        `${apiVersion}/users/update-password`,
+        `${apiVersion}/users/update/loggedout/password`,
         `${apiVersion}/settings`,
       ],
     })
@@ -71,14 +72,6 @@ const bootstrapApp = async () => {
   /*** SETUP BODY PARSER ***/
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
-
-  /*** PARSE NESTED FILTERS */
-  app.use((req, res, next) => {
-    if (req.query.filters && Object.keys(req.query.filters)) {
-      req.query.filters = JSON.parse(req.query.filters);
-    }
-    next();
-  });
 
   /*** SETUP INDEX ROUTE ***/
   app.get("/", (req, res) => {
@@ -89,9 +82,14 @@ const bootstrapApp = async () => {
   app.use(apiVersion, require("./routes"));
 
   /** START BOT */
-  const { createBot } = require("./bot");
+  // const { createBot } = require("./bot");
+  const client = require("./bot");
   const settings = await Settings.query().select("enable_bot").first();
-  createBot(settings.enable_bot);
+  // createBot(settings.enable_bot);
+
+  if (settings.enable_bot) {
+    client.login(process.env.DISCORD_BOT_TOKEN);
+  }
 
   /*** SETUP ERROR HANDLING ***/
   app.use(require("./middleware/errors"));

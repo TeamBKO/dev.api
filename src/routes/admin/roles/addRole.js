@@ -5,6 +5,7 @@ const pick = require("lodash.pick");
 const { body } = require("express-validator");
 const { validate } = require("$util");
 const { VIEW_ALL_ADMIN, ADD_ALL_ROLES } = require("$util/policies");
+const { deleteCacheByPattern } = require("$services/redis/helpers");
 
 const consoleLog = (req, res, next) => {
   console.log(req.body, req.query);
@@ -31,6 +32,8 @@ const addRole = async function (req, res, next) {
     );
 
     role.members = 0;
+
+    deleteCacheByPattrn("roles:");
 
     res.status(200).send(role);
   } catch (err) {

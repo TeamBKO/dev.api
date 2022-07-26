@@ -4,6 +4,7 @@ const sanitize = require("sanitize-html");
 const filterQuery = require("$util/filterQuery");
 const pick = require("lodash.pick");
 const { param, query } = require("express-validator");
+const { getCachedQuery } = require("$services/redis/helpers");
 const { validate } = require("$util");
 
 const validators = validate([
@@ -35,6 +36,7 @@ const select = [
   "roster_members.is_deletable",
   "member.username as username",
   "member.avatar as avatar",
+  "member.id as userID",
 ];
 
 const getRosterMembers = async function (req, res, next) {
@@ -50,22 +52,36 @@ const getRosterMembers = async function (req, res, next) {
       .joinRelated("[member(defaultSelects)]")
       .select(select)
       .where("roster_members.roster_id", req.params.id)
-      .withGraphFetched("[rank, form(default)]")
+      .withGraphFetched("[rank, form(default).[fields(useAsColumn)]]")
       .orderBy("roster_members.roster_rank_id", "asc")
-      .orderBy("roster_members.id"),
+      .orderBy("roster_members.id")
+      .limit(25),
     filters,
     "roster_members"
   );
 
   let query;
-
+  const cacheID = req.params.id.split("-")[4];
   if (nextCursor) {
-    query = await memberQuery.clone().cursorPage(nextCursor);
+    const next = nextCursor.split(".")[0];
+    query = await getCachedQuery(
+      `members:${cacheID}:${next}`,
+      memberQuery.clone().cursorPage(nextCursor),
+      60
+    );
   } else {
-    query = await memberQuery.clone().cursorPage();
+    query = await getCachedQuery(
+      `members:${cacheID}:first`,
+      memberQuery.clone().cursorPage(),
+      60
+    );
   }
 
-  console.log(query);
+  // if (nextCursor) {
+  //   query = await memberQuery.clone().cursorPage(nextCursor);
+  // } else {
+  //   query = await memberQuery.clone().cursorPage();
+  // }
 
   res.status(200).send(query);
 };

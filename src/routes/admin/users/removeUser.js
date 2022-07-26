@@ -6,6 +6,7 @@ const { query } = require("express-validator");
 const { validate } = require("$util");
 const { VIEW_ALL_ADMIN, DELETE_ALL_USERS } = require("$util/policies");
 const getUserSessions = require("$util/getUserSessions");
+const { deleteCacheByPattern } = require("$services/redis/helpers");
 
 const columns = ["id", "avatar", "username", "email", "created_at"];
 
@@ -30,11 +31,13 @@ const removeUser = async function (req, res, next) {
     const pipeline = redis.pipeline();
 
     req.query.ids.forEach((id) => {
-      pipeline.del(`user_${id}`);
-      pipeline.del(`me_${id}`);
+      pipeline.del(`user:${id}`);
+      pipeline.del(`me:${id}`);
     });
 
     pipeline.exec();
+
+    deleteCacheByPattern("users:");
 
     res.status(200).send(deleted);
   } catch (err) {

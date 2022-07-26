@@ -1,6 +1,6 @@
 "use strict";
 const User = require("$models/User");
-const getCache = require("$util/getCache");
+const { getCachedQuery } = require("$services/redis/helpers");
 
 const { header } = require("express-validator");
 
@@ -23,9 +23,12 @@ const getOwnUserDetails = async function (req, res, next) {
     return res.status(403).send("Forbidden");
   }
 
-  let user = await getCache(
-    `me_${req.user.id}`,
-    User.query().select(columns).where("id", req.user.id).first()
+  let user = await getCachedQuery(
+    `me:${req.user.id}`,
+    User.query().select(columns).where("id", req.user.id).first(),
+    true,
+    undefined,
+    false
   );
 
   res.status(200).send(user);

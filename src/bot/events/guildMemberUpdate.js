@@ -1,6 +1,9 @@
 "use strict";
 const Role = require("$models/Role");
 const User = require("$models/User");
+const BotWatched = require("$models/BotWatched");
+const redis = require("$services/redis");
+const { getCachedQuery } = require("$services/redis/helpers");
 
 class DiscordMember {
   constructor(oldMember, newMember) {
@@ -27,19 +30,32 @@ module.exports = {
   name: "guildMemberUpdate",
   once: false,
   async execute(oldMember, newMember, client) {
-    let watched = [];
+    // let watched = [];
 
-    if (process.env.DISCORD_WATCHED_ROLES) {
-      watched = process.env.DISCORD_WATCHED_ROLES.split(",");
-    }
+    // if (process.env.DISCORD_WATCHED_ROLES) {
+    //   watched = process.env.DISCORD_WATCHED_ROLES.split(",");
+    // }
+
+    /** WATCH FOR SPECIFIC ROLES TO CHANGE ON USERS */
+
+    let watched = await getCachedQuery(
+      `watched`,
+      BotWatched.query()
+        .joinRelated("discord_roles")
+        .select("discord_roles.discord_role_id as id"),
+      true,
+      undefined,
+      false,
+      600
+    );
 
     if (!watched || !watched.length) return;
+
+    watched = watched.map(({ id }) => id);
 
     const m = new DiscordMember(oldMember, newMember);
 
     if (!watched.includes(m.role)) return;
-
-    console.log(m);
 
     const user = await User.query().where("discord_id", m.id).select("id");
 

@@ -43,23 +43,16 @@ const validators = validate([
 const updateEmailRequest = async function (req, res, next) {
   if (req.params.code) return next();
 
-  console.log(req.body);
-
   const id = req.user.id,
-    email = req.body.email,
     password = req.body.password;
-
-  if (!email) {
-    return res.status(400).send({ message: "Missing email address." });
-  }
 
   if (!password) {
     return res.status(400).send({ message: "Missing password" });
   }
 
   try {
-    if (await redis.exists(`e:${id}`)) {
-      const json = JSON.parse(await redis.get(`e:${id}`));
+    if (await redis.exists(`update:email:${id}`)) {
+      const json = JSON.parse(await redis.get(`email:${id}`));
 
       const expiry = parseISO(json.expiry);
 
@@ -78,7 +71,7 @@ const updateEmailRequest = async function (req, res, next) {
 
     const [account, settings] = await Promise.all([
       User.query()
-        .where({ id, email, active: true })
+        .where({ id, active: true })
         .select("id", "username", "password", "email", "active")
         .first()
         .throwIfNotFound(),
@@ -86,7 +79,7 @@ const updateEmailRequest = async function (req, res, next) {
     ]);
 
     if (!(await bcrypt.compare(password, account.password))) {
-      return res.status(401).send("Invalid credentials.");
+      return res.status(401).send({ message: "Invalid credentials." });
     }
 
     const code = nanoid(32);
@@ -99,7 +92,7 @@ const updateEmailRequest = async function (req, res, next) {
     const exp = settings.universal_request_ttl_in_minutes * 60;
 
     await redis.set(
-      `e:${account.id}`,
+      `update:email:${account.id}`,
       JSON.stringify({ code, expiry: expiryDate }),
       "NX",
       "EX",
@@ -120,24 +113,23 @@ const updateEmailRequest = async function (req, res, next) {
 
 const updateUserEmail = async (req, res, next) => {
   const id = req.user.id,
-    email = req.body.email,
     code = req.params.code;
 
   if (!code) {
     return res.status(400).send({ message: "Missing code." });
   }
 
-  if (!(await redis.exists(`e:${id}`))) {
+  if (!(await redis.exists(`update:email:${id}`))) {
     return res.status(200).send({
       status: 1,
-      message: "Email change request expired or doesn't exist.",
+      message: "Edit email request expired or doesn't exist.",
     });
   }
 
   const trx = await User.startTransaction();
 
   try {
-    const info = JSON.parse(await redis.get(`e:${id}`));
+    const info = JSON.parse(await redis.get(`update:email:${id}`));
 
     if (code !== info.code) {
       return res
@@ -152,9 +144,9 @@ const updateUserEmail = async (req, res, next) => {
 
     await trx.commit();
 
-    await redis.del(`e:${id}`);
-    await redis.del(`me_${req.user.id}`);
-    await redis.del(`user_${req.user.id}`);
+    await redis.del(`email:${id}`);
+    await redis.del(`me:${id}`);
+    await redis.del(`user:${id}`);
 
     res.status(200).send(user);
   } catch (err) {
@@ -165,7 +157,7 @@ const updateUserEmail = async (req, res, next) => {
 };
 
 module.exports = {
-  path: "/update/contact/:code?",
+  path: "/update/email/:code?",
   method: "PATCH",
   middleware: [validators, updateEmailRequest],
   handler: updateUserEmail,

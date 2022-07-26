@@ -52,7 +52,7 @@ const getRosterRank = async function (req, res, next) {
     ranks = await RosterRank.query()
       .select(["id", "name", "icon", "priority"])
       .where("roster_id", req.query.roster_id)
-      .andWhere("priority", ">=", hasAccess.priority)
+      .andWhere("priority", "<=", hasAccess.priority)
       .orderBy("roster_ranks.priority", "asc")
       .orderBy("roster_ranks.id", "asc")
       .limit(10)
@@ -65,8 +65,6 @@ const getRosterRank = async function (req, res, next) {
     .where("roster_members.id", req.params.id)
     .withGraphFetched("[rank(default), permissions(default)]")
     .first();
-
-  console.log(member);
 
   res.status(200).send(Object.assign({}, { member, ranks }));
 };

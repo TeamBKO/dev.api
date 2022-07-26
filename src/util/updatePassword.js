@@ -1,35 +1,19 @@
 "use strict";
+const redis = require("$services/redis");
 const User = require("$models/User");
 const bcrypt = require("bcrypt");
-const sanitize = require("sanitize-html");
 const SALT_ROUNDS = 12;
-const redis = require("$services/redis");
-const { body } = require("express-validator");
-const { validate } = require("$util");
-const { transaction } = require("objection");
 
-const validators = [
-  validate([
-    body("code").isString().escape().trim(),
-    body("id").isNumeric().toInt(10),
-    body("password")
-      .notEmpty()
-      .escape()
-      .trim()
-      .customSanitizer((v) => sanitize(v)),
-    body("confirm")
-      .notEmpty()
-      .escape()
-      .trim()
-      .customSanitizer((v) => sanitize(v)),
-  ]),
-];
+module.exports = async function updatePassword(req, res, next) {
+  const id = req.user ? req.user.id : req.body.id,
+    code = req.user ? req.params.code : req.body.code,
+    key = req.user ? `pw:update:${id}` : `pw:reset:${id}`;
 
-const updateUserPassword = async (req, res, next) => {
-  const id = req.body.id,
-    code = req.body.code;
+  if (!id) {
+    return res.status(400).send({ status: 1, message: "Missing credentials." });
+  }
 
-  if (!(await redis.exists(`pw:${id}`))) {
+  if (!(await redis.exists(key))) {
     return res.status(200).send({
       status: 1,
       message: "Password reset request expired or doesn't exist.",
@@ -39,7 +23,7 @@ const updateUserPassword = async (req, res, next) => {
   const trx = await User.startTransaction();
 
   try {
-    const info = JSON.parse(await redis.get(`pw:${id}`));
+    const info = JSON.parse(await redis.get(key));
 
     if (code !== info.code) {
       return res
@@ -63,7 +47,7 @@ const updateUserPassword = async (req, res, next) => {
       .where("id", id)
       .returning("id");
 
-    await redis.del(`pw:${id}`);
+    await redis.del(key);
     await redis.del(`login:user:${id}`);
 
     await trx.commit();
@@ -80,11 +64,4 @@ const updateUserPassword = async (req, res, next) => {
     await trx.rollback();
     next(err);
   }
-};
-
-module.exports = {
-  path: "/update-password",
-  method: "PATCH",
-  middleware: [validators],
-  handler: updateUserPassword,
 };

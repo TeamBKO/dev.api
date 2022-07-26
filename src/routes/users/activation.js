@@ -11,9 +11,6 @@ const getCountTillNextRequest = require("$util/getCountTillNextRequest");
 const activateAccount = async function (req, res) {
   const parsedID = parseInt(req.body.id, 10);
 
-  console.log(req.body.code);
-  console.log(req.body.id);
-
   const [account, settings] = await Promise.all([
     User.query()
       .where("id", parsedID)
@@ -21,7 +18,7 @@ const activateAccount = async function (req, res) {
       .first(),
     Settings.query()
       .where("id", 1)
-      .select(["user_activation_request_ttl_in_minutes"])
+      .select(["universal_request_ttl_in_minutes"])
       .first(),
   ]);
 
@@ -45,13 +42,12 @@ const activateAccount = async function (req, res) {
     });
   }
 
-  console.log(await redis.get(req.body.id));
-
-  if (await redis.exists(req.body.id)) {
-    const code = await redis.get(req.body.id);
+  if (await redis.exists(`activation:${req.body.id}`)) {
+    const key = `activation:${req.body.id}`;
+    const code = await redis.get(key);
 
     if (req.body.code === code) {
-      await redis.del(req.body.id);
+      await redis.del(key);
       await User.query().patch({ active: true }).where("id", parsedID);
       return res.status(200).send({
         resend: false,
@@ -71,7 +67,7 @@ const activateAccount = async function (req, res) {
     { resend: true, status: 1, message },
     getCountTillNextRequest(
       account.last_activation_email_sent,
-      settings.user_activation_request_ttl_in_minutes
+      settings.universal_request_ttl_in_minutes
     )
   );
 
@@ -84,7 +80,7 @@ module.exports = {
   middleware: [
     validate([
       header("authorization").isEmpty(),
-      body("id").isString().escape().trim(),
+      body("id").isNumeric().toInt(10),
       body("code")
         .isString()
         .customSanitizer((v) => sanitize(v)),

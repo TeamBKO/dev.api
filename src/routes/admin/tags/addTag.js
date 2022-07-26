@@ -2,6 +2,7 @@
 const Tag = require("$models/Tag");
 const guard = require("express-jwt-permissions")();
 const sanitize = require("sanitize-html");
+const { deleteCacheByPattern } = require("$services/redis/helpers");
 const { body } = require("express-validator");
 const { validate } = require("$util");
 const { transaction } = require("objection");
@@ -29,6 +30,8 @@ const addTag = async function (req, res, next) {
       .returning("id");
 
     await trx.commit();
+
+    deleteCacheByPattern("tags:");
 
     const tag = await Tag.query().where("id", inserted.id).first();
 

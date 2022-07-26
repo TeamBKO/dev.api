@@ -2,9 +2,28 @@
 const { validationResult } = require("express-validator");
 const jwt = require("jsonwebtoken");
 const phin = require("phin");
+const getCache = require("$util/getCache");
+
+const isUndefined = () => val === undefined;
+
+const getQueryResults = async (key, query, hasFilters) => {
+  if (isUndefined(hasFilters)) {
+    return query;
+  }
+  return getCache(key, query);
+};
 
 const shouldRevokeToken = (req) => {
   const { addPolicies, removePolicies, addRoles, removeRoles } = req.body;
+
+  // return (
+  //   (addPolicies && Array.isArray(addPolicies) && addPolicies.length) ||
+  //   (removePolicies &&
+  //     Array.isArray(removePolicies) &&
+  //     removePolicies.length) ||
+  //   (addRoles && Array.isArray(addRoles) && addRoles.length) ||
+  //   (removeRoles && Array.isArray(removeRoles) && removeRoles.length)
+  // );
 
   if (
     (addPolicies && Array.isArray(addPolicies)) ||
@@ -147,6 +166,9 @@ module.exports = {
   validate,
   getDiscordRoles,
   verifyToken,
+  verifySignature,
   checkIfRolesExist,
   shouldRevokeToken,
+  isUndefined,
+  getQueryResults,
 };

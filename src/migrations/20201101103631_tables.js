@@ -160,30 +160,20 @@ exports.up = function (knex) {
           .onDelete("CASCADE");
       });
     }),
-    knex.schema.hasTable("user_forms").then((exists) => {
+
+    knex.schema.hasTable("roster_form_fields").then((exists) => {
       if (exists) return;
-      return knex.schema.createTable("user_forms", (t) => {
+      return knex.schema.createTable("roster_form_fields", (t) => {
         t.uuid("id").primary();
-        t.integer("form_id")
-          .references("id")
-          .inTable("forms")
-          .onDelete("CASCADE");
-        t.uuid("roster_member_id")
-          .references("roster_members.id")
-          .onDelete("CASCADE")
-          .onUpdate("CASCADE");
-        t.timestamps();
-      });
-    }),
-    knex.schema.hasTable("user_form_fields").then((exists) => {
-      if (exists) return;
-      return knex.schema.createTable("user_form_fields", (t) => {
-        t.increments("id").primary();
         t.uuid("form_id")
-          .references("user_forms.id")
+          .references("roster_member_forms.id")
           .onDelete("CASCADE")
           .onUpdate("CASCADE");
-        t.integer("field_id")
+        // t.uuid("form_id")
+        //   .references("user_forms.id")
+        //   .onDelete("CASCADE")
+        //   .onUpdate("CASCADE");
+        t.uuid("field_id")
           .references("fields.id")
           .onDelete("CASCADE")
           .onUpdate("CASCADE");
@@ -191,18 +181,19 @@ exports.up = function (knex) {
         t.timestamps();
       });
     }),
+
     knex.schema.hasTable("testimonies").then((exists) => {
       if (exists) return;
       return knex.schema.createTable("testimonies", (t) => {
         // t.uuid("id").defaultTo(knex.raw("gen_random_uuid()")).primary();
-        t.increments("id").primary();
-        t.integer("order");
+        t.uuid("id").primary();
         t.string("author");
         t.string("avatar");
         t.text("text");
         t.timestamps();
       });
     }),
+
     knex.schema.hasTable("settings").then((exists) => {
       if (exists) return;
       return knex.schema.createTable("settings", (t) => {
@@ -222,9 +213,6 @@ exports.up = function (knex) {
         t.boolean("allow_users_to_delete_account").defaultTo(false);
         t.integer("universal_request_ttl_in_minutes").defaultTo(10);
         t.integer("number_of_login_attempts").defaultTo(5);
-        // t.integer("password_reset_request_ttl_in_minutes").defaultTo(10);
-        // t.integer("user_activation_request_ttl_in_minutes").defaultTo(10);
-        // t.integer("user_deletion_request_ttl_in_minutes").defaultTo(3);
         t.string("time_till_next_username_change").defaultTo("1 week");
         t.string("front_page_video_url").defaultTo(
           "https://blackout-gaming.s3.amazonaws.com/video/0001-0876.webm"
@@ -233,6 +221,14 @@ exports.up = function (knex) {
         t.string("bot_prefix").defaultTo("!");
         t.string("bot_server_id").defaultTo("549246767577825283");
         t.string("bot_recruitment_channel_id").defaultTo("883085542051438592");
+        t.text("bot_recruitment_description");
+        t.boolean("cache_users_on_fetch").defaultTo(true);
+        t.boolean("cache_roles_on_fetch").defaultTo(true);
+        t.boolean("cache_forms_on_fetch").defaultTo(true);
+        t.boolean("cache_categories_on_fetch").defaultTo(true);
+        t.boolean("cache_tags_on_fetch").defaultTo(true);
+        t.boolean("cache_rosters_on_fetch").defaultTo(true);
+        t.integer("cache_ttl").defaultTo(120);
       });
     }),
 
@@ -311,6 +307,16 @@ exports.up = function (knex) {
     //       .onDelete("CASCADE");
     //   });
     // }),
+    knex.schema.hasTable("bot_watched_roles").then((exists) => {
+      if (exists) return;
+      return knex.schema.createTable("bot_watched_roles", (t) => {
+        t.uuid("id").primary();
+        t.integer("discord_role_id")
+          .references("discord_roles.id")
+          .onUpdate("CASCADE")
+          .onDelete("CASCADE");
+      });
+    }),
     knex.schema.hasTable("categories").then((exists) => {
       if (exists) return;
       return knex.schema.createTable("categories", (t) => {
@@ -325,22 +331,21 @@ exports.up = function (knex) {
       if (exists) return;
       return knex.schema.createTable("tags", (t) => {
         t.increments("id").primary();
-        // t.uuid("id").defaultTo(knex.raw("gen_random_uuid()")).primary();
         t.string("name").unique();
         t.string("color");
         t.boolean("is_deletable").defaultTo(true);
         t.timestamps();
       });
     }),
-    knex.schema.hasTable("post_types").then((exists) => {
-      if (exists) return;
-      return knex.schema.createTable("post_types", (t) => {
-        t.increments("id").primary();
-        t.integer("user_id").references("users.id");
-        t.string("name").unique();
-        t.timestamps();
-      });
-    }),
+    // knex.schema.hasTable("post_types").then((exists) => {
+    //   if (exists) return;
+    //   return knex.schema.createTable("post_types", (t) => {
+    //     t.uuid("id").primary();
+    //     t.integer("user_id").references("users.id");
+    //     t.string("name").unique();
+    //     t.timestamps();
+    //   });
+    // }),
     knex.schema.hasTable("rosters").then((exists) => {
       if (exists) return;
       return knex.schema.createTable("rosters", (t) => {
@@ -353,12 +358,37 @@ exports.up = function (knex) {
         t.boolean("apply_roles_on_approval").defaultTo(false);
         t.boolean("private").defaultTo(false);
         t.boolean("auto_approve").defaultTo(false);
+        t.boolean("show_fields_as_columns").defaultTo(false);
+        t.boolean("assign_discord_roles_on_approval").defaultTo(false);
+        t.boolean("display_applicant_forms_on_discord").defaultTo(false);
+        t.string("approved_applicant_channel_id");
+        t.string("pending_applicant_channel_id");
+        t.string("rejected_applicant_channel_id");
         t.integer("creator_id")
           .references("users.id")
           .onDelete("CASCADE")
           .onUpdate("CASCADE");
         t.boolean("is_deletable").defaultTo(true);
         t.boolean("is_disabled").defaultTo(false);
+        t.timestamps();
+      });
+    }),
+    knex.schema.hasTable("roster_member_forms").then((exists) => {
+      if (exists) return;
+      return knex.schema.createTable("roster_member_forms", (t) => {
+        t.uuid("id").primary();
+        t.integer("form_id")
+          .references("id")
+          .inTable("forms")
+          .onDelete("CASCADE");
+        t.uuid("roster_id")
+          .references("rosters.id")
+          .onDelete("CASCADE")
+          .onUpdate("CASCADE");
+        t.uuid("roster_member_id")
+          .references("roster_members.id")
+          .onDelete("CASCADE")
+          .onUpdate("CASCADE");
         t.timestamps();
       });
     }),
@@ -470,10 +500,6 @@ exports.up = function (knex) {
       if (exists) return;
       return knex.schema.createTable("forms", (t) => {
         t.increments("id").primary();
-        t.uuid("roster_id")
-          .references("rosters.id")
-          .onUpdate("CASCADE")
-          .onDelete("CASCADE");
         t.integer("creator_id")
           .references("users.id")
           .onUpdate("CASCADE")
@@ -488,9 +514,12 @@ exports.up = function (knex) {
     knex.schema.hasTable("fields").then((exists) => {
       if (exists) return;
       return knex.schema.createTable("fields", (t) => {
-        t.increments("id").primary();
+        t.uuid("id").primary();
         t.text("value");
+        t.string("alias").nullable();
+        t.boolean("use_as_column").defaultTo(false);
         t.integer("order");
+        t.boolean("multiple").defaultTo(false);
         t.enum("type", [
           "textfield",
           "textarea",
@@ -509,7 +538,7 @@ exports.up = function (knex) {
           .references("forms.id")
           .onUpdate("CASCADE")
           .onDelete("CASCADE");
-        t.integer("field_id")
+        t.uuid("field_id")
           .references("fields.id")
           .onUpdate("CASCADE")
           .onDelete("CASCADE");
@@ -533,22 +562,22 @@ exports.up = function (knex) {
         t.integer("menu_child_id").references("menu.id");
       });
     }),
-    knex.schema.hasTable("posts").then((exists) => {
-      if (exists) return;
-      return knex.schema.createTable("posts", (t) => {
-        t.increments("id").primary();
-        t.integer("user_id").references("users.id");
-        t.integer("post_type").references("post_types.id");
-        t.string("slug");
-        t.string("title");
-        t.string("featured_image");
-        t.jsonb("data");
-        t.text("excerpt");
-        t.boolean("has_excerpt").defaultTo(false);
-        t.boolean("is_deletable").defaultTo(true);
-        t.timestamps();
-      });
-    }),
+    // knex.schema.hasTable("posts").then((exists) => {
+    //   if (exists) return;
+    //   return knex.schema.createTable("posts", (t) => {
+    //     t.increments("id").primary();
+    //     t.integer("user_id").references("users.id");
+    //     t.integer("post_type").references("post_types.id");
+    //     t.string("slug");
+    //     t.string("title");
+    //     t.string("featured_image");
+    //     t.jsonb("data");
+    //     t.text("excerpt");
+    //     t.boolean("has_excerpt").defaultTo(false);
+    //     t.boolean("is_deletable").defaultTo(true);
+    //     t.timestamps();
+    //   });
+    // }),
     knex.schema.hasTable("media").then((exists) => {
       if (exists) return;
       return knex.schema.createTable("media", (t) => {
@@ -586,12 +615,12 @@ exports.down = async function (knex) {
   return Promise.all([
     knex.raw(
       `DROP TABLE IF EXISTS rosters, roster_forms, roster_member_permissions, roster_permissions, roster_members, 
-    roster_ranks, roster_roles, media_share, user_form_fields,
-    user_forms, user_sessions, user_policies, form_fields, fields, 
+    roster_ranks, roster_roles, media_share, roster_form_fields,
+    roster_member_forms, roster_table_columns, user_sessions, user_policies, form_fields, fields, 
     forms, menu_tree, menu, event_participants, 
     event_roles, event_meta, events, categories, 
     user_roles, role_maps, discord_roles, role_policies, policies, post_types,
-    users, roles, media, posts, testimonies, tags,
+    users, roles, media, posts, testimonies, tags, bot_watched_roles,
     settings, front_page_info`
     ),
     knex.raw(DROP_BEFORE_INSERT),

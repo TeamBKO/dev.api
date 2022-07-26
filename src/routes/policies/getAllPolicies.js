@@ -1,10 +1,15 @@
 "use strict";
 const Policy = require("$models/Policy");
-const { query } = require("express-validator");
-const { validate } = require("$util");
+const { getCachedQuery } = require("$services/redis/helpers");
 
 const getAllPolicies = async function (req, res, next) {
-  const policies = await Policy.query();
+  const policies = await getCachedQuery(
+    "policies",
+    Policy.query(),
+    true,
+    undefined,
+    false
+  );
 
   res.status(200).send(policies);
 };
@@ -12,6 +17,5 @@ const getAllPolicies = async function (req, res, next) {
 module.exports = {
   path: "/",
   method: "GET",
-
   handler: getAllPolicies,
 };

@@ -8,6 +8,7 @@ const getUserSessionsByRoleID = require("$util/getUserSessionsByRoleID");
 const { param, body } = require("express-validator");
 const { validate, shouldRevokeToken } = require("$util");
 const { VIEW_ALL_ADMIN, UPDATE_ALL_ROLES } = require("$util/policies");
+const { deleteCacheByPattern } = require("$services/redis/helpers");
 const { transaction, raw } = require("objection");
 const uniq = require("lodash.uniq");
 
@@ -53,8 +54,8 @@ const updateRole = async (req, res, next) => {
 
   try {
     await Role.updateRole(req.params.id, req.body, trx);
-    await redis.del(`role_${req.params.id}`);
-    await trx.commit();
+    await redis.del(`role:${req.params.id}`);
+    deleteCacheByPattern("roles:");
 
     if (shouldRevokeToken(req)) {
       const sessions = await getUserSessionsByRoleID(req.params.id);
@@ -65,14 +66,12 @@ const updateRole = async (req, res, next) => {
       query = query.withGraphFetched("[policies, discord_roles]");
     }
 
+    await trx.commit();
+
     const role = await query
       .where("id", req.params.id)
-      .select(
-        uniq(["name", "id", "updated_at", ...Object.keys(req.body.details)])
-      )
+      .select(["name", "id", "updated_at", "level"])
       .first();
-
-    console.log(role);
 
     res.status(200).send(role);
   } catch (err) {

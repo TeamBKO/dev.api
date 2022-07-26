@@ -1,5 +1,6 @@
 const { Model } = require("objection");
-class Field extends Model {
+const guid = require("$util/mixins/guid")();
+class Field extends guid(Model) {
   static get tableName() {
     return "fields";
   }
@@ -10,6 +11,11 @@ class Field extends Model {
       order(builder) {
         builder.orderBy(ref("order"), "asc");
       },
+
+      useAsColumn(builder) {
+        builder.where("fields.use_as_column", true);
+        // .select(["answer", "options", "fields.alias", "user_form_fields.id"]);
+      },
     };
   }
 
@@ -18,7 +24,7 @@ class Field extends Model {
       type: "object",
 
       properties: {
-        id: { type: "integer" },
+        id: { type: "string" },
         value: { type: "string" },
         type: { type: "string" },
         optional: { type: "boolean" },

@@ -5,11 +5,17 @@ const { query } = require("express-validator");
 const filterQuery = require("$util/filterQuery");
 const { validate } = require("$util");
 const { VIEW_ALL_ADMIN, VIEW_ALL_TAGS } = require("$util/policies");
+const {
+  getCachedSettings,
+  getCachedQuery,
+} = require("$services/redis/helpers");
 
 const getAllCategories = async function (req, res, next) {
   const nextCursor = req.query.nextCursor;
 
-  let query = filterQuery(
+  const settings = await getCachedSettings();
+
+  let tagQuery = filterQuery(
     Tag.query().orderBy("created_at", "desc").orderBy("id"),
     req.query
   );
@@ -17,9 +23,20 @@ const getAllCategories = async function (req, res, next) {
   let tags;
 
   if (nextCursor) {
-    tags = await query.clone().cursorPage(nextCursor);
+    const next = nextCursor.split(".")[0];
+    tags = await getCachedQuery(
+      `tags:${next}`,
+      tagQuery.clone().cursorPage(nextCursor),
+      settings.cache_tags_on_fetch,
+      undefined
+    );
   } else {
-    tags = await query.clone().cursorPage();
+    tags = await getCachedQuery(
+      "tags:first",
+      tagQuery.clone().cursorPage(),
+      settings.cache_tags_on_fetch,
+      undefined
+    );
   }
 
   res.status(200).send(tags);

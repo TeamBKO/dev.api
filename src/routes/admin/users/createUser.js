@@ -6,6 +6,7 @@ const SALT_ROUNDS = 12;
 const sanitize = require("sanitize-html");
 const guard = require("express-jwt-permissions")();
 const filterQuery = require("$util/filterQuery");
+const { deleteCacheByPattern } = require("$services/redis/helpers");
 const { body } = require("express-validator");
 const { validate } = require("$util");
 const { VIEW_ALL_ADMIN, ADD_ALL_USERS } = require("$util/policies");
@@ -135,6 +136,8 @@ const createUser = async function (req, res, next) {
     );
 
     console.log("user", user);
+
+    deleteCacheByPattern("users:");
 
     res.status(200).send(user);
   } catch (err) {

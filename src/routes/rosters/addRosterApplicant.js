@@ -1,12 +1,18 @@
 "use strict";
 const RosterRank = require("$models/RosterRank");
 const RosterMember = require("$models/RosterMember");
+const RosterForm = require("$models/RosterForm");
+const Settings = require("$models/Settings");
+const redis = require("$services/redis");
 const User = require("$models/User");
 const Roster = require("$models/Roster");
 const sanitize = require("sanitize-html");
 const pick = require("lodash.pick");
+const formatAndSendToDiscord = require("$services/discord/helpers/formatAndSendToDiscord");
+const client = require("$root/src/bot");
 const { body, param } = require("express-validator");
 const { validate } = require("$util");
+const { deleteCacheByPattern } = require("$services/redis/helpers");
 
 const validators = validate([
   param("id")
@@ -20,7 +26,7 @@ const validators = validate([
   //   .trim()
   //   .escape()
   //   .customSanitizer((v) => sanitize(v)),
-  body("fields.*.id").isNumeric().toInt(10),
+  body("fields.*.id").isUUID(),
 ]);
 
 const insertFn = (member_id, form_id, roster_id, rank_id, fields) => {
@@ -44,7 +50,7 @@ const insertFn = (member_id, form_id, roster_id, rank_id, fields) => {
   };
 
   if (form_id) {
-    Object.assign(result, { form: { form_id } });
+    Object.assign(result, { form: { form_id, roster_id } });
   }
 
   if (fields && fields.length) {
@@ -69,9 +75,18 @@ const addRosterApplicant = async function (req, res, next) {
     relate: ["rank", "form", "form.form_fields", "permissions"],
   };
 
+  const { enable_bot } = await Settings.query().select("enable_bot").first();
+
   const settings = await Roster.query()
     .withGraphFetched("roles")
-    .select(["auto_approve", "apply_roles_on_approval"])
+    .select([
+      "auto_approve",
+      "apply_roles_on_approval",
+      "url",
+      "display_applicant_forms_on_discord",
+      "approved_applicant_channel_id",
+      "pending_applicant_channel_id",
+    ])
     .first();
 
   if (!req.query.edit) {
@@ -114,7 +129,7 @@ const addRosterApplicant = async function (req, res, next) {
       await RosterMember.query(trx)
         .upsertGraph(insert, options)
         .returning("id", "status"),
-      ["id", "status"]
+      ["id", "roster_id", "status"]
     );
 
     if (
@@ -129,7 +144,31 @@ const addRosterApplicant = async function (req, res, next) {
         .for(req.user.id)
         .relate(rolesToRelate);
     }
+
     await trx.commit();
+    await redis.del(`roster:${req.params.id}`);
+    deleteCacheByPattern("rosters:");
+
+    if (enable_bot && settings.display_applicant_forms_on_discord) {
+      let form = await RosterForm.query()
+        .withGraphJoined(
+          "[fields(order), applicant(default).member(defaultSelects)]"
+        )
+        .select([
+          "roster_member_forms.id",
+          "roster_member_forms.created_at",
+          "roster_member_forms.updated_at",
+        ])
+        .where("roster_member_id", member.id)
+        .andWhere("roster_id", req.params.id)
+        .first();
+
+      if (settings.auto_approve && settings.approved_applicant_channel_id) {
+        formatAndSendToDiscord(form, settings.approved_applicant_channel_id);
+      } else {
+        formatAndSendToDiscord(form, settings.pending_applicant_channel_id);
+      }
+    }
 
     const roster = await Roster.query().select(
       "id",
@@ -145,9 +184,6 @@ const addRosterApplicant = async function (req, res, next) {
         .as("joined")
     );
 
-    console.log("roster", roster);
-    console.log("member", member);
-
     res.status(200).send({ roster, member });
   } catch (err) {
     console.log(err);
@@ -160,12 +196,11 @@ module.exports = {
   path: "/:id",
   method: "POST",
   middleware: [
-    (req, res, next) => {
-      console.log(req.body);
-      next();
-    },
+    // (req, res, next) => {
+    //   console.log(req.body);
+    //   next();
+    // },
     validators,
-    // verifyRecaptcha,
   ],
   handler: addRosterApplicant,
 };

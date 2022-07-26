@@ -2,9 +2,11 @@
 const RosterRank = require("$models/RosterRank");
 const RosterMember = require("$models/RosterMember");
 const sanitize = require("sanitize-html");
+const redis = require("$services/redis");
 
 const { param } = require("express-validator");
 const { validate } = require("$util");
+const { deleteCacheByPattern } = require("$services/redis/helpers");
 
 const validators = validate([
   param("id")
@@ -16,6 +18,7 @@ const validators = validate([
 
 const removeRank = async function (req, res, next) {
   const hasAccess = await RosterMember.query()
+    .select("roster_id")
     .joinRelated("[permissions, rank.[permissions]]")
     .where("roster_members.member_id", req.user.id)
     .andWhere((qb) =>
@@ -39,6 +42,9 @@ const removeRank = async function (req, res, next) {
       .first()
       .returning(["id", "name"]);
     await trx.commit();
+
+    await redis.del(`roster:${hasAccess.roster_id}`);
+    deleteCacheByPattern(`members:${hasAccess.roster_id}:`);
 
     res.status(200).send(item);
   } catch (err) {

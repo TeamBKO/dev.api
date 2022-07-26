@@ -7,6 +7,7 @@ const { query } = require("express-validator");
 const { validate } = require("$util");
 const { transaction } = require("objection");
 const { VIEW_ALL_ADMIN, DELETE_ALL_ROLES } = require("$util/policies");
+const { deleteCacheByPattern } = require("$services/redis/helpers");
 const getUserSessionsByRoleID = require("$util/getUserSessionsByRoleID");
 
 const middleware = [
@@ -36,10 +37,11 @@ const removeRole = async function (req, res, next) {
       if (sessions && sessions.length) await redis.multi(sessions).exec();
 
       pipeline.exec();
-      await redis.del("roles");
     }
 
     await trx.commit();
+    deleteCacheByPattern("role:");
+    deleteCacheByPattern("roles:");
 
     res.status(200).send(deleted);
   } catch (err) {

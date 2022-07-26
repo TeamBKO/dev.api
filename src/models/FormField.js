@@ -10,7 +10,7 @@ class FormField extends Model {
       type: "object",
       properties: {
         form_id: { type: "integer" },
-        field_id: { type: "integer" },
+        field_id: { type: "string" },
       },
     };
   }

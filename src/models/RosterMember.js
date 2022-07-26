@@ -1,4 +1,5 @@
 "use strict";
+const { BitField } = require("discord.js");
 const { Model } = require("objection");
 
 const cursor = require("objection-cursor")({
@@ -68,7 +69,7 @@ class RosterMember extends cursor(guid(dates(Model))) {
   static get relationMappings() {
     const User = require("$models/User");
     const RosterRank = require("$models/RosterRank");
-    const UserForm = require("$models/UserForm");
+    const RosterForm = require("$models/RosterForm");
     const Roster = require("$models/Roster");
     return {
       roster: {
@@ -97,11 +98,11 @@ class RosterMember extends cursor(guid(dates(Model))) {
       },
       form: {
         relation: Model.HasOneRelation,
-        modelClass: UserForm,
+        modelClass: RosterForm,
         join: {
           from: "roster_members.id",
           extra: ["form_id"],
-          to: "user_forms.roster_member_id",
+          to: "roster_member_forms.roster_member_id",
         },
       },
       permissions: {

@@ -6,7 +6,7 @@ const redis = require("$services/redis");
 const { param, query } = require("express-validator");
 const { validate } = require("$util");
 const { VIEW_ALL_ADMIN, UPDATE_ALL_USERS } = require("$util/policies");
-const { transaction, raw } = require("objection");
+const { deleteCacheByPattern } = require("$services/redis/helpers");
 
 const removeUserRole = async function (req, res, next) {
   const userId = req.params.id,
@@ -26,8 +26,9 @@ const removeUserRole = async function (req, res, next) {
       await redis.multi(sessions).exec();
     }
     await trx.commit();
-    await redis.del(`user_${userId}`);
-    await redis.del(`me_${userId}`);
+    await redis.del(`user:${userId}`);
+    await redis.del(`me:${userId}`);
+    deleteCacheByPattern("users:");
     res.status(200).send({ user_id: userId, role_id: roleId });
   } catch (err) {
     await trx.rollback();

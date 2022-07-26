@@ -1,5 +1,5 @@
 "use strict";
-const UserForm = require("$models/UserForm");
+const RosterForm = require("$models/RosterForm");
 const RosterMember = require("$models/RosterMember");
 const Roster = require("$models/Roster");
 const sanitize = require("sanitize-html");
@@ -24,15 +24,19 @@ const getRosterMemberForm = async (req, res, next) => {
     .where("id", rosterId)
     .first();
 
-  let form = await UserForm.query()
+  let form = await RosterForm.query()
     .withGraphJoined(
       "[fields(order), applicant(default).member(defaultSelects)]"
     )
-    .select(["user_forms.id", "user_forms.created_at", "user_forms.updated_at"])
-    .where("user_forms.id", req.params.id)
+    .select([
+      "roster_member_forms.id",
+      "roster_member_forms.created_at",
+      "roster_member_forms.updated_at",
+    ])
+    .where("roster_member_forms.id", req.params.id)
     .first();
 
-  console.log(form);
+  console.log("roster_member", form);
 
   res.status(200).send({ form, roster });
 };

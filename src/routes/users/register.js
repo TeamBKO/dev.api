@@ -41,9 +41,9 @@ const register = async function (req, res, next) {
 
       const exp = settings.universal_request_ttl_in_minutes * 60;
 
-      await redis.set(user.id, code, "NX", "EX", exp);
+      await redis.set(`activation:${user.id}`, code, "NX", "EX", exp);
 
-      await sendEmail(user.email, "USER_REGISTERATION", {
+      await sendEmail(user.email, "USER_REGISTRATION", {
         url: process.env.BASE_URL + "activation",
         id: user.id,
         code,

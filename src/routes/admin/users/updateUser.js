@@ -8,7 +8,7 @@ const emitter = require("$services/redis/emitter");
 const { body, param } = require("express-validator");
 const { validate, shouldRevokeToken } = require("$util");
 const { VIEW_ALL_ADMIN, UPDATE_ALL_USERS } = require("$util/policies");
-const { transaction } = require("objection");
+const { deleteCacheByPattern } = require("$services/redis/helpers");
 
 const validators = validate([
   param("id").isNumeric().toInt(10),
@@ -66,8 +66,9 @@ const updateUser = async (req, res, next) => {
     .where("id", req.params.id)
     .first();
 
-  await redis.del(`user_${req.params.id}`);
-  await redis.del(`me_${req.params.id}`);
+  await redis.del(`user:${req.params.id}`);
+  await redis.del(`me:${req.params.id}`);
+  deleteCacheByPattern("users:");
 
   console.log(user);
 

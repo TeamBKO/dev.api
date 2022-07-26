@@ -4,7 +4,7 @@ const guard = require("express-jwt-permissions")();
 const redis = require("$services/redis");
 const { query, param } = require("express-validator");
 const { validate } = require("$util");
-const { transaction } = require("objection");
+const { deleteKeysByPattern } = require("$services/redis/helpers");
 const { VIEW_ALL_ADMIN } = require("$util/policies");
 
 const validators = validate([query("ids.*").isNumeric().toInt(10)]);
@@ -18,13 +18,10 @@ const removeCategory = async function (req, res, next) {
       .delete()
       .returning("id");
 
-    const pipeline = redis.pipeline();
-    req.query.ids.forEach((id) => pipeline.del(`r_form_${id}`));
-    pipeline.del("categories");
-    pipeline.del("recruit_categories");
-    pipeline.del("form_categories");
+    await trx.commit();
 
-    pipeline.exec();
+    deleteKeysByPattern("categories:");
+
     res.status(200).send(deleted);
   } catch (err) {
     await trx.rollback();

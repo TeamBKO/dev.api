@@ -1,9 +1,5 @@
 "use strict";
 const Role = require("$models/Role");
-const DiscordRole = require("$models/DiscordRole");
-const Policy = require("$models/Policy");
-const Settings = require("$models/Settings");
-const getCache = require("$util/getCache");
 
 const guard = require("express-jwt-permissions")();
 const { param } = require("express-validator");
@@ -13,16 +9,10 @@ const {
   VIEW_ALL_ROLES,
   UPDATE_ALL_ROLES,
 } = require("$util/policies");
-
-// const select = [
-//   "roles.id",
-//   "roles.name",
-//   "roles.level",
-//   "roles.is_deletable",
-//   "roles.is_removable",
-//   "roles.created_at",
-//   "roles.updated_at",
-// ];
+const {
+  getCachedQuery,
+  getCachedSettings,
+} = require("$services/redis/helpers");
 
 const select = [
   "id",
@@ -44,14 +34,19 @@ const getRole = async function (req, res) {
   //   Object.assign(response, { discord });
   // }
 
-  const role = await getCache(
-    `role_${req.params.id}`,
+  const settings = await getCachedSettings();
+
+  const role = await getCachedQuery(
+    `role:${req.params.id}`,
     Role.query()
       .where("id", req.params.id)
       .select(select)
       .withGraphFetched("[policies, discord_roles]")
       .first()
-      .throwIfNotFound()
+      .throwIfNotFound(),
+    settings.cache_roles_on_fetch,
+    undefined,
+    false
   );
 
   // let [role, selectable] = await Promise.all([

@@ -1,7 +1,6 @@
 "use strict";
 const Discord = require("discord.js");
 const client = new Discord.Client();
-const config = require("./config.json");
 const fs = require("fs");
 const path = require("path");
 
@@ -24,8 +23,12 @@ const createBot = function (isEnabled = true) {
       }
     }
 
-    if (isEnabled) client.login(process.env.DISCORD_BOT_TOKEN);
+    // if (isEnabled) client.login(process.env.DISCORD_BOT_TOKEN);
+
+    return client;
   }
 };
 
-module.exports = { createBot, client };
+// module.exports = { createBot, client };
+
+module.exports = createBot();

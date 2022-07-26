@@ -1,25 +1,5 @@
 "use strict";
-const Settings = require("$models/Settings");
-
-const select = [
-  "show_video",
-  "show_video_on_mobile",
-  "show_testimonies",
-  "allow_users_to_delete_account",
-  "enable_account_media_sharing",
-  // "password_reset_request_ttl_in_minutes",
-  // "user_activation_request_ttl_in_minutes",
-  "universal_request_ttl_in_minutes",
-  "time_till_next_username_change",
-  "show_recruitment_button",
-  "enable_user_authentication",
-  "enable_social_authentication",
-  "enable_local_authentication",
-  "enable_bot",
-  "bot_prefix",
-  "bot_server_id",
-  "front_page_video_url",
-];
+const { getCachedSettings } = require("$services/redis/helpers");
 
 const getSettings = async (req, res) => {
   // let [settings, policies] = await Promise.all([
@@ -35,7 +15,7 @@ const getSettings = async (req, res) => {
   //   return output;
   // }, {});
 
-  const settings = await Settings.query().select(select).first();
+  const settings = await getCachedSettings();
 
   res.status(200).send(settings);
 };

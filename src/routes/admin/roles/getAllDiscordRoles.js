@@ -18,14 +18,14 @@ const getAllRoles = async function (req, res, next) {
     query = await roleQuery.clone().cursorPage();
   }
 
-  res.status(200).send(roles);
+  res.status(200).send(query);
 };
 
 module.exports = {
   path: "/discord",
   method: "GET",
   middleware: [
-    guard.check([VIEW_ALL_ADMIN, VIEW_ALL_ROLES]),
+    guard.check([VIEW_ALL_ADMIN]),
     validate([query("nextCursor").optional().isString().escape().trim()]),
   ],
   handler: getAllRoles,

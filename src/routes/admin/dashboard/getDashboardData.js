@@ -2,7 +2,7 @@
 const User = require("$models/User");
 const guard = require("express-jwt-permissions")();
 const { query } = require("express-validator");
-const { client } = require("$bot");
+const client = require("$bot");
 const { raw } = require("objection");
 const { VIEW_ALL_ADMIN } = require("$util/policies");
 

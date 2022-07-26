@@ -1,10 +1,12 @@
 "use strict";
-const UserForm = require("$models/UserForm");
+const RosterForm = require("$models/RosterForm");
 const RosterMember = require("$models/RosterMember");
-const getCache = require("$util/getCache");
+const massageMemberData = require("$util/massageMemberData");
+const redis = require("$services/redis");
 const sanitize = require("sanitize-html");
 const { param, body } = require("express-validator");
 const { validate } = require("$util");
+const { deleteCacheByPattern } = require("$services/redis/helpers");
 
 const validators = validate([
   param("id")
@@ -26,11 +28,15 @@ const validators = validate([
     .customSanitizer((v) => sanitize(v)),
 ]);
 
-const upsert = (id, member_id, form_id, fields) => {
+const upsert = (id, member_id, form_id, roster_id, fields) => {
   const result = {};
 
   if (id) {
     Object.assign(result, { id });
+  }
+
+  if (roster_id) {
+    Object.assign(result, { roster_id });
   }
 
   if (form_id) {
@@ -72,27 +78,35 @@ const upsertMemberForm = async function (req, res, next) {
       return res.status(404).send({ message: "That member doesn't exist." });
     }
 
-    const data = upsert(req.params.id, member_id, form_id, fields);
+    const data = upsert(req.params.id, member_id, form_id, roster_id, fields);
 
-    const trx = await UserForm.startTransaction();
+    const trx = await RosterForm.startTransaction();
 
     try {
-      const result = await UserForm.query(trx)
-        .upsertGraph(data, {
-          relate: ["form", "form_fields"],
-        })
-        .returning(["id", "roster_member_id"]);
+      const result = await RosterForm.query(trx).upsertGraph(data, {
+        relate: ["form", "form_fields"],
+      });
 
       await trx.commit();
 
-      console.log(result);
-
-      const member = await RosterMember.query()
-        .joinRelated("member(defaultSelects)")
-        .select(["member.id", "member.username"])
-        .where("roster_members.member_id", result.roster_member_id)
+      const { roster_member_id } = await RosterForm.query()
+        .select("roster_member_id")
+        .where("id", result.id)
         .first();
-      res.status(200).send({ form: result.id, member });
+
+      const member = massageMemberData(
+        await RosterMember.query()
+          .joinRelated("member(defaultSelects)")
+          .withGraphFetched("form(default).[fields(useAsColumn)]")
+          .select(["roster_members.id", "member.username"])
+          .where("roster_members.id", roster_member_id)
+          .first()
+      );
+
+      await redis.del(`roster:${roster_id}`);
+      deleteCacheByPattern(`members:${roster_id.split("-")[4]}:`);
+
+      res.status(200).send({ formID: result.id, member });
     } catch (err) {
       console.log(err);
       await trx.rollback();

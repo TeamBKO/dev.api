@@ -1,11 +1,12 @@
 "use strict";
 const Media = require("$models/Media");
 const guard = require("express-jwt-permissions")();
+const redis = require("$services/redis");
 const { query } = require("express-validator");
 const { deleteFiles } = require("$services/upload");
 const { validate } = require("$util");
 const { DELETE_OWN_MEDIA } = require("$util/policies");
-const { transaction } = require("objection");
+const { deleteCacheByPattern } = require("$services/redis/helpers");
 
 const validators = validate([query("keys.*").isString()]);
 
@@ -26,6 +27,8 @@ const removeOwnMedia = async (req, res, next) => {
       .returning(["id"]);
 
     await trx.commit();
+    deleteCacheByPattern(`media:${req.user.id}:`);
+    await redis.del(`media:${req.user.id}:first`);
 
     const deleted = results.map(({ id }) => id);
 

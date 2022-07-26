@@ -2,8 +2,6 @@
 const uploadFile = require("$services/upload");
 const Media = require("$models/Media");
 const guard = require("express-jwt-permissions")();
-const User = require("$models/User");
-const { transaction } = require("objection");
 const { ADD_OWN_MEDIA } = require("$util/policies");
 
 const uploadAvatarMiddleware = async (req, res, next) => {

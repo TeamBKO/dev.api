@@ -1,10 +1,12 @@
 "use strict";
 const Roster = require("$models/Roster");
 const RosterMember = require("$models/RosterMember");
+const Settings = require("$models/Settings");
 const guard = require("express-jwt-permissions")();
 const sanitize = require("sanitize-html");
 const filterQuery = require("$util/filterQuery");
 const pick = require("lodash.pick");
+const { getCachedQuery } = require("$services/redis/helpers");
 const { query } = require("express-validator");
 const { validate } = require("$util");
 const { VIEW_ALL_ADMIN } = require("$util/policies");
@@ -46,6 +48,10 @@ const getAllRosters = async function (req, res) {
   const filters = pick(req.query, ["exclude", "searchByName", "limit"]);
   const nextCursor = req.query.nextCursor;
 
+  const settings = await Settings.query()
+    .select("cache_rosters_on_fetch")
+    .first();
+
   const rosterQuery = filterQuery(
     Roster.query()
       .withGraphFetched("[roster_form(default), creator(defaultSelects)]")
@@ -69,10 +75,39 @@ const getAllRosters = async function (req, res) {
   let query;
 
   if (nextCursor) {
-    query = await rosterQuery.clone().cursorPage(nextCursor);
+    const next = nextCursor.split(".")[0];
+    query = await getCachedQuery(
+      `rosters:${next}`,
+      rosterQuery.clone().cursorPage(nextCursor),
+      settings.cache_rosters_on_fetch,
+      filters
+    );
   } else {
-    query = await rosterQuery.clone().cursorPage();
+    query = await getCachedQuery(
+      "rosters:first",
+      rosterQuery.clone().cursorPage(),
+      settings.cache_rosters_on_fetch,
+      filters
+    );
   }
+
+  // if (nextCursor) {
+  //   if (!Object.keys(filters).length) {
+  //     const next = nextCursor.split(".")[0];
+  //     query = await getCache(
+  //       `rosters_${next}`,
+  //       rosterQuery.clone().cursorPage(nextCursor)
+  //     );
+  //   } else {
+  //     query = await rosterQuery.clone().cursorPage(nextCursor);
+  //   }
+  // } else {
+  //   if (!Object.keys(filters).length) {
+  //     query = await getCache("first-rosters", rosterQuery.clone().cursorPage());
+  //   } else {
+  //     query = await rosterQuery.clone().cursorPage();
+  //   }
+  // }
 
   res.status(200).send(query);
 };

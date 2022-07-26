@@ -1,10 +1,13 @@
 "use strict";
 const Form = require("$models/Form");
-
 const sanitize = require("sanitize-html");
 
 const { query } = require("express-validator");
 const { validate } = require("$util");
+const {
+  getCachedSettings,
+  getCachedQuery,
+} = require("$services/redis/helpers");
 
 const select = [
   "forms.id",
@@ -16,6 +19,9 @@ const select = [
 
 const getAllForms = async function (req, res, next) {
   const nextCursor = req.query.nextCursor;
+  const filters = {};
+
+  const settings = await getCachedSettings();
 
   let formQuery = Form.query()
     .select(select)
@@ -27,9 +33,20 @@ const getAllForms = async function (req, res, next) {
   let forms;
 
   if (nextCursor) {
-    forms = await formQuery.clone().cursorPage(nextCursor);
+    const next = nextCursor.split(".")[0];
+    forms = await getCachedQuery(
+      `forms:${next}`,
+      formQuery.clone().cursorPage(nextCursor),
+      settings.cache_forms_on_fetch,
+      filters
+    );
   } else {
-    forms = await formQuery.clone().cursorPage();
+    forms = await getCachedQuery(
+      "forms:first",
+      formQuery.clone().cursorPage(),
+      settings.cache_forms_on_fetch,
+      filters
+    );
   }
 
   console.log(forms);

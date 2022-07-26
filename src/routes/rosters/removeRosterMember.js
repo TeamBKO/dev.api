@@ -1,9 +1,11 @@
 "use strict";
 const RosterMember = require("$models/RosterMember");
 const sanitize = require("sanitize-html");
+const redis = require("$services/redis");
 
 const { param, query } = require("express-validator");
 const { validate } = require("$util");
+const { deleteCacheByPattern } = require("$services/redis/helpers");
 
 const validators = validate([
   param("id")
@@ -22,6 +24,7 @@ const validators = validate([
 
 const removeRosterMember = async function (req, res, next) {
   const hasAccess = await RosterMember.query()
+    .select("roster_members.roster_id")
     .joinRelated("[permissions, rank.[permissions]]")
     .where("roster_members.member_id", req.user.id)
     .andWhere((qb) =>
@@ -48,6 +51,9 @@ const removeRosterMember = async function (req, res, next) {
   try {
     const items = await query;
     await trx.commit();
+    await redis.del(`roster:${hasAccess.roster_id}`);
+    deleteCacheByPattern(`members:${hasAccess.roster_id.split("-")[4]}:`);
+    deleteCacheByPattern("rosters:");
     res.status(200).send(items);
   } catch (err) {
     console.log(err);

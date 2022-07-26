@@ -4,9 +4,10 @@ const RosterMember = require("$models/RosterMember");
 const guard = require("express-jwt-permissions")();
 const sanitize = require("sanitize-html");
 const slugify = require("slugify");
+const redis = require("$services/redis");
+const { deleteCacheByPattern } = require("$services/redis/helpers");
 const { body } = require("express-validator");
 const { validate } = require("$util");
-const { transaction } = require("objection");
 const { VIEW_ALL_ADMIN } = require("$util/policies");
 
 const isUndefined = (v) => v === undefined;
@@ -26,10 +27,25 @@ const validators = validate([
   body("enable_recruitment").optional().isBoolean(),
   body("auto_approve").optional().isBoolean(),
   body("apply_roles_on_approval").optional().isBoolean(),
+  body("show_fields_as_columns").optional().isBoolean(),
   body("private").optional().isBoolean(),
   body("is_disabled").optional().isBoolean(),
   body("selectedForm").optional().isNumeric().toInt(10),
   body("selectedRoles.*").notEmpty().optional().isNumeric().toInt(10),
+  body("display_applicant_forms_on_discord").optional().isBoolean(),
+  body("assign_discord_roles_on_approval").optional().isBoolean(),
+  body("approved_applicant_channel_id")
+    .optional()
+    .isString()
+    .customSanitizer((v) => sanitize(v)),
+  body("pending_applicant_channel_id")
+    .optional()
+    .isString()
+    .customSanitizer((v) => sanitize(v)),
+  body("rejected_applicant_channel_id")
+    .optional()
+    .isString()
+    .customSanitizer((v) => sanitize(v)),
 ]);
 
 const generateGraph = (userId, body) => {
@@ -149,9 +165,27 @@ const generateGraph = (userId, body) => {
     ],
   };
 
-  if (body.icon) {
-    Object.assign(results, { icon: body.icon });
-  }
+  const keys = [
+    "icon",
+    "enable_recruitment",
+    "auto_approve",
+    "apply_roles_on_approval",
+    "show_fields_as_columns",
+    "private",
+    "is_disabled",
+    "assign_discord_roles_on_approval",
+    "display_applicant_forms_on_discord",
+    "display_applicant_forms_on_discord",
+    "approved_applicant_channel_id",
+    "pending_applicant_channel_id",
+    "rejected_applicant_channel_id",
+  ];
+
+  keys.forEach((key) => {
+    if (!isUndefined(body[key])) {
+      Object.assign(results, { [key]: body[key] });
+    }
+  });
 
   if (body.banner) {
     Object.assign(results, { banner: body.banner });
@@ -162,34 +196,12 @@ const generateGraph = (userId, body) => {
     });
   }
 
-  if (!isUndefined(body.enable_recruitment)) {
-    Object.assign(results, { enable_recruitment: body.enable_recruitment });
-  }
-
-  if (!isUndefined(body.auto_approve)) {
-    Object.assign(results, { auto_approve: body.auto_approve });
-  }
-
-  if (!isUndefined(body.apply_roles_on_approval)) {
-    Object.assign(results, {
-      apply_roles_on_approval: body.apply_roles_on_approval,
-    });
-  }
-
-  if (!isUndefined(body.private)) {
-    Object.assign(results, { private: body.private });
-  }
-
-  if (!isUndefined(body.is_disabled)) {
-    Object.assign(results, { is_disabled: body.is_disabled });
-  }
-
   if (!isUndefined(body.selectedForm)) {
     Object.assign(results, { roster_form: { id: body.selectedForm } });
   }
 
-  if (body.selectedRoles && body.selectedRoles.length) {
-    Object.assign(results, { roles: body.selectedRoles.map((id) => ({ id })) });
+  if (body.roles && body.roles.length) {
+    Object.assign(results, { roles: body.roles.map((id) => ({ id })) });
   }
 
   return results;
@@ -218,6 +230,10 @@ const addRoster = async function (req, res, next) {
       ],
       allowRefs: true,
     });
+
+    // await redis.del("rosters:");
+    deleteCacheByPattern("rosters:");
+
     await trx.commit();
 
     const roster = await Roster.query()

@@ -1,5 +1,5 @@
 "use strict";
-const blaver = require("blaver");
+const { faker } = require("@faker-js/faker");
 const bcrypt = require("bcrypt");
 const { startOfMonth, endOfMonth } = require("date-fns");
 const SALT = 12;
@@ -118,28 +118,28 @@ const generateUsers = async (num) => {
 
   for (let i = 0; i <= num; i++) {
     const roles = [];
-    const roleNum = blaver.datatype.number({ min: 1, max: 4 });
+    const roleNum = faker.datatype.number({ min: 1, max: 4 });
 
     for (let u = 0; u <= roleNum; u++) {
-      roles.push({ id: blaver.datatype.number({ min: 1, max: 4 }) });
+      roles.push({ id: faker.datatype.number({ min: 1, max: 4 }) });
     }
 
     const userRoles = uniqBy(roles, "id");
 
-    const date = blaver.date.between(
+    const date = faker.date.between(
       startOfMonth(new Date()),
       endOfMonth(new Date())
     );
 
     users.push({
-      username: blaver.internet.userName(),
+      username: faker.internet.userName(),
       password: hashed,
-      email: blaver.internet.email(),
-      avatar: blaver.image.avatar(),
-      first_name: blaver.name.firstName(),
-      last_name: blaver.name.lastName(),
+      email: faker.internet.email(),
+      avatar: faker.image.avatar(),
+      first_name: faker.name.firstName(),
+      last_name: faker.name.lastName(),
       local: true,
-      active: blaver.datatype.boolean(),
+      active: faker.datatype.boolean(),
       roles: userRoles,
       created_at: date,
       updated_at: date,
@@ -152,7 +152,7 @@ const generateUsers = async (num) => {
     username: "Helix",
     email: "mmccauleyjr@rogers.com",
     password: hashed,
-    avatar: blaver.internet.avatar(),
+    avatar: faker.internet.avatar(),
     local: true,
     active: true,
     roles: [{ id: 1 }],
