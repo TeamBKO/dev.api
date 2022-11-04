@@ -8,6 +8,7 @@ const aws = require("aws-sdk");
 const expressJwt = require("express-jwt");
 const pino = require("express-pino-logger")();
 const Settings = require("$models/Settings");
+const { getCachedSettings } = require("$services/redis/helpers");
 
 /*** SETUP S3 CONFIG ***/
 aws.config.update({
@@ -70,8 +71,8 @@ const bootstrapApp = async () => {
   );
 
   /*** SETUP BODY PARSER ***/
-  app.use(express.json());
-  app.use(express.urlencoded({ extended: true }));
+  app.use(express.json({ limit: "10mb" }));
+  app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
   /*** SETUP INDEX ROUTE ***/
   app.get("/", (req, res) => {
@@ -81,11 +82,11 @@ const bootstrapApp = async () => {
   /** SETUP ROUTES */
   app.use(apiVersion, require("./routes"));
 
-  /** START BOT */
-  // const { createBot } = require("./bot");
+  /** START BOT IF ENABLED */
+
   const client = require("./bot");
-  const settings = await Settings.query().select("enable_bot").first();
-  // createBot(settings.enable_bot);
+  const settings = await getCachedSettings();
+  // const settings = await Settings.query().select("enable_bot").first();
 
   if (settings.enable_bot) {
     client.login(process.env.DISCORD_BOT_TOKEN);

@@ -91,30 +91,31 @@ class DiscordClient {
    * @returns {promise<Object>}
    */
   async getGuildMember(token, guildId, userId) {
-    return new Promise(async (resolve, reject) => {
-      if (!token) {
-        reject(new Error("Missing BOT token."));
-      }
+    if (!token) {
+      Promise.reject(new Error("Missing BOT token."));
+    }
 
-      try {
-        const resp = await phin({
-          url: `${this._baseUrl}/guilds/${guildId}/members/${userId}`,
-          method: "GET",
-          headers: {
-            Authorization: `Bot ${token}`,
-          },
-          parse: "json",
-        });
-        resolve(new GuildMember(resp.body));
-      } catch (err) {
-        console.log(err);
-        reject(
-          err.error
-            ? new Error(err.error)
-            : new APIError(err["phinResponse"].statusCode)
-        );
-      }
-    });
+    try {
+      const resp = await phin({
+        url: `${this._baseUrl}/guilds/${guildId}/members/${userId}`,
+        method: "GET",
+        headers: {
+          Authorization: `Bot ${token}`,
+        },
+        parse: "json",
+      });
+
+      console.log("guild_member_response", resp);
+
+      Promise.resolve(new GuildMember(resp.body));
+    } catch (err) {
+      console.log(err);
+      reject(
+        err.error
+          ? new Error(err.error)
+          : new APIError(err["phinResponse"].statusCode)
+      );
+    }
   }
 
   /**

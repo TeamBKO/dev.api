@@ -18,7 +18,9 @@ const removeTag = async function (req, res, next) {
       .delete()
       .returning("id");
 
-    deleteCacheByPattern("tags:");
+    const ids = req.query.ids.map((id) => `tag:${id}`).join("|");
+
+    deleteCacheByPattern(`?(tags*|${ids}`);
 
     res.status(200).send(deleted);
   } catch (err) {

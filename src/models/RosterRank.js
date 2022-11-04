@@ -89,8 +89,8 @@ class RosterRank extends cursor(guid(dates(Model))) {
         name: { type: "string" },
         icon: { type: "string" },
         is_deletable: { type: "boolean" },
-        created_at: { type: "date" },
-        updated_at: { type: "date" },
+        created_at: { type: "string" },
+        updated_at: { type: "string" },
       },
     };
   }

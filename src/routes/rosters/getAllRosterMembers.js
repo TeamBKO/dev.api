@@ -1,10 +1,15 @@
 "use strict";
 const RosterMember = require("$models/RosterMember");
+const Roster = require("$models/Roster");
 const sanitize = require("sanitize-html");
 const filterQuery = require("$util/filterQuery");
+const massageMemberData = require("$util/massageMemberData");
 const pick = require("lodash.pick");
 const { param, query } = require("express-validator");
-const { getCachedQuery } = require("$services/redis/helpers");
+const {
+  getCachedQuery,
+  getCachedSettings,
+} = require("$services/redis/helpers");
 const { validate } = require("$util");
 
 const validators = validate([
@@ -40,48 +45,47 @@ const select = [
 ];
 
 const getRosterMembers = async function (req, res, next) {
-  const filters = pick(req.query, [
-    "status",
-    "rank",
-    "searchByMemberName",
-    "exclude",
-  ]);
+  const status = req.query.status;
+
+  const filters = pick(req.query, ["rank", "searchByMemberName", "exclude"]);
+
+  const settings = await getCachedSettings();
+
+  let eager = "[rank(default), forms(default).[fields(useAsColumn)]]";
+
+  let rosterMemberQuery = RosterMember.query()
+    .joinRelated("[member(defaultSelects)]")
+    .select(select)
+    .where("roster_members.roster_id", req.params.id)
+    .andWhere("roster_members.status", status)
+    .withGraphFetched(eager)
+    .orderBy("roster_members.roster_rank_id", "asc")
+    .orderBy("roster_members.id")
+    .limit(25);
+
   const nextCursor = req.query.nextCursor;
-  const memberQuery = filterQuery(
-    RosterMember.query()
-      .joinRelated("[member(defaultSelects)]")
-      .select(select)
-      .where("roster_members.roster_id", req.params.id)
-      .withGraphFetched("[rank, form(default).[fields(useAsColumn)]]")
-      .orderBy("roster_members.roster_rank_id", "asc")
-      .orderBy("roster_members.id")
-      .limit(25),
-    filters,
-    "roster_members"
-  );
+  const memberQuery = filterQuery(rosterMemberQuery, filters, "roster_members");
 
   let query;
   const cacheID = req.params.id.split("-")[4];
   if (nextCursor) {
     const next = nextCursor.split(".")[0];
     query = await getCachedQuery(
-      `members:${cacheID}:${next}`,
+      `roster:${cacheID}:members:${status}:${next}`,
       memberQuery.clone().cursorPage(nextCursor),
+      settings.cache_rosters_on_fetch,
       60
     );
   } else {
     query = await getCachedQuery(
-      `members:${cacheID}:first`,
+      `roster:${cacheID}:members:${status}:first`,
       memberQuery.clone().cursorPage(),
-      60
+      settings.cache_roster_on_fetch,
+      120
     );
   }
 
-  // if (nextCursor) {
-  //   query = await memberQuery.clone().cursorPage(nextCursor);
-  // } else {
-  //   query = await memberQuery.clone().cursorPage();
-  // }
+  query.results = query.results.map(massageMemberData);
 
   res.status(200).send(query);
 };

@@ -1,7 +1,10 @@
 "use strict";
 const User = require("$models/User");
 const guard = require("express-jwt-permissions")();
-const { getCachedQuery } = require("$services/redis/helpers");
+const {
+  getCachedQuery,
+  getCachedSettings,
+} = require("$services/redis/helpers");
 const { param } = require("express-validator");
 const { validate } = require("$util");
 const { VIEW_ALL_ADMIN, VIEW_ALL_USERS } = require("$util/policies");
@@ -17,6 +20,8 @@ const columns = [
 ];
 
 const getSingleUser = async function (req, res, next) {
+  const settings = await getCachedSettings();
+
   const user = await getCachedQuery(
     `user:${req.params.id}`,
     User.query()
@@ -25,9 +30,7 @@ const getSingleUser = async function (req, res, next) {
       .select(columns)
       .first()
       .throwIfNotFound(),
-    true,
-    undefined,
-    false
+    settings.cache_users_on_fetch
   );
 
   res.status(200).send(user);

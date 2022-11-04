@@ -69,8 +69,6 @@ const getAllRosters = async function (req, res) {
     );
   }
 
-  console.log(query);
-
   res.status(200).send(query);
 };
 

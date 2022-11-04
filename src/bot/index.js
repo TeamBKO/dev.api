@@ -1,34 +1,43 @@
 "use strict";
-const Discord = require("discord.js");
-const client = new Discord.Client();
-const fs = require("fs");
-const path = require("path");
+const { Client, GatewayIntentBits, Collection } = require("discord.js");
 
-const createBot = function (isEnabled = true) {
-  if (!client.isReady) {
-    const eventFiles = fs
-      .readdirSync(path.join(__dirname, "events"))
-      .filter((file) => file.endsWith(".js"));
+const client = new Client({
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.MessageContent],
+});
 
-    if (client.Status === 5) {
-      console.log("Discord bot disconnecting....");
-    }
+const fs = require("node:fs");
+const path = require("node:path");
 
-    for (const file of eventFiles) {
-      const event = require(`./events/${file}`);
-      if (event.once) {
-        client.once(event.name, (...args) => event.execute(...args, client));
-      } else {
-        client.on(event.name, (...args) => event.execute(...args, client));
-      }
-    }
+const eventsPath = path.join(__dirname, "events");
 
-    // if (isEnabled) client.login(process.env.DISCORD_BOT_TOKEN);
+const eventFiles = fs
+  .readdirSync(eventsPath)
+  .filter((file) => file.endsWith(".js"));
 
-    return client;
+if (client.Status === 5) {
+  console.log("Discord bot disconnecting....");
+}
+
+for (const file of eventFiles) {
+  const filePath = path.join(eventsPath, file);
+  const event = require(filePath);
+  if (event.once) {
+    client.once(event.name, (...args) => event.execute(...args, client));
+  } else {
+    client.on(event.name, (...args) => event.execute(...args, client));
   }
-};
+}
 
-// module.exports = { createBot, client };
+client.commands = new Collection();
+const commandsPath = path.join(__dirname, "commands");
+const commandFiles = fs
+  .readdirSync(commandsPath)
+  .filter((file) => file.endsWith(".js"));
 
-module.exports = createBot();
+for (const file of commandFiles) {
+  const filePath = path.join(commandsPath, file);
+  const command = require(filePath);
+  client.commands.set(command.name, command);
+}
+
+module.exports = client;

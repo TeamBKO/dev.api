@@ -34,15 +34,14 @@ class Media extends cursor(guid(dateMixin(Model))) {
         url: { type: "string" },
         storage_key: { type: "string" },
         owner_id: { type: "integer" },
-        created_at: { type: "date" },
-        updated_at: { type: "date" },
+        created_at: { type: "string" },
+        updated_at: { type: "string" },
       },
     };
   }
 
   static get relationMappings() {
     const User = require("$models/User");
-    // const Media = require("$models/Media");
     return {
       uploader: {
         relation: Model.BelongsToOneRelation,
@@ -52,78 +51,7 @@ class Media extends cursor(guid(dateMixin(Model))) {
           to: "users.id",
         },
       },
-      media_shared_users: {
-        relation: Model.ManyToManyRelation,
-        modelClass: User,
-        join: {
-          from: "media.id",
-          through: {
-            from: "media_share.media_id",
-            to: "media_share.user_id",
-          },
-          to: "users.id",
-        },
-      },
-      // media_sharing: {
-      //   relation: Model.HasManyRelation,
-      //   modelClass: __filename,
-      //   join: {
-      //     from: "media_share.media_id",
-      //     to: "media.id",
-      //   },
-      // },
-
-      shared_media: {
-        relation: Model.ManyToManyRelation,
-        modelClass: __filename,
-        join: {
-          from: "users.id",
-          through: {
-            from: "media_share.user_id",
-            to: "media_share.media_id",
-          },
-          to: "media.id",
-        },
-      },
     };
-  }
-
-  static async updateSharing(req) {
-    const result = {};
-
-    const add = userList(req, "add");
-    const remove = userList(req, "remove");
-
-    const trx = await this.startTransaction();
-
-    try {
-      if (add || (Array.isArray(add) && add.length)) {
-        const added = await Media.relatedQuery("media_shared_users", trx)
-          .for(req.params.id)
-          .relate(add);
-        Object.assign(result, { added });
-      }
-
-      if (remove) {
-        let removed = Media.relatedQuery("media_shared_users", trx)
-          .for(req.params.id)
-          .unrelate();
-        if (Array.isArray(remove) && remove.length) {
-          removed = removed.whereIn("users.id", remove);
-        } else {
-          removed = removed.where("users.id", remove);
-        }
-
-        Object.assign(result, { removed: await removed });
-      }
-
-      await trx.commit();
-
-      return result;
-    } catch (err) {
-      await trx.rollback();
-      return Promise.reject(err);
-    }
   }
 }
 

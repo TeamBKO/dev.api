@@ -9,24 +9,6 @@ const cursor = require("objection-cursor")({
   },
 });
 
-class RosterColumn extends guid(Model) {
-  static get tableName() {
-    return "roster_table_columns";
-  }
-
-  static get jsonSchema() {
-    return {
-      type: "object",
-      required: ["roster_id", "column_name"],
-      properties: {
-        id: { type: "string" },
-        roster_id: { type: "string" },
-        column_name: { type: "string" },
-      },
-    };
-  }
-}
-
 class Roster extends cursor(guid(dateMixin(Model))) {
   static get tableName() {
     return "rosters";
@@ -55,8 +37,8 @@ class Roster extends cursor(guid(dateMixin(Model))) {
         creator_id: { type: "integer" },
         is_deleted: { type: "boolean" },
         is_disabled: { type: "integer" },
-        created_at: { type: "date" },
-        updated_at: { type: "date" },
+        created_at: { type: "string" },
+        updated_at: { type: "string" },
       },
     };
   }
@@ -68,14 +50,6 @@ class Roster extends cursor(guid(dateMixin(Model))) {
     const RosterRank = require("$models/RosterRank");
     const RosterMember = require("$models/RosterMember");
     return {
-      columns: {
-        relation: Model.HasManyRelation,
-        modelClass: RosterColumn,
-        join: {
-          from: "rosters.id",
-          to: "roster_table_columns.roster_id",
-        },
-      },
       creator: {
         relation: Model.HasOneRelation,
         modelClass: User,
@@ -125,6 +99,10 @@ class Roster extends cursor(guid(dateMixin(Model))) {
         },
       },
     };
+  }
+
+  static get URL() {
+    return process.env.BASE_URL + `/rosters/${this.url}`;
   }
 
   static async updateRoster(id, data, trx) {

@@ -1,5 +1,4 @@
 "use strict";
-const { BitField } = require("discord.js");
 const { Model } = require("objection");
 
 const cursor = require("objection-cursor")({
@@ -96,8 +95,8 @@ class RosterMember extends cursor(guid(dates(Model))) {
           to: "users.id",
         },
       },
-      form: {
-        relation: Model.HasOneRelation,
+      forms: {
+        relation: Model.HasManyRelation,
         modelClass: RosterForm,
         join: {
           from: "roster_members.id",

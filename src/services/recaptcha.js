@@ -1,8 +1,6 @@
 "use strict";
 const phin = require("phin");
 
-// const errors = (errs) => (type) => errs.indexOf(type) !== -1;
-
 /**
  * Returns the recaptcha uri to verify the response.
  * @param {string} secret The google recaptcha secret.
@@ -14,13 +12,17 @@ const recaptchaURI = (secret, response) => {
 };
 /**
  * calls next() and moves the request forward
- * @param {string} secret THe google recaptcha secret.
+ * @param {string} secret The google recaptcha secret.
  */
 const verifyRecaptcha = function (secret) {
-  if (!secret || typeof secret !== "string") {
-    throw new Error("Recaptcha secret is either missing or not a string");
-  }
   return async function (req, res, next) {
+    if (!secret || typeof secret !== "string") {
+      const error = new Error();
+      error.message = "Recaptcha secret is either missing or not a string";
+      error.statusCode = 500;
+      return next(error);
+    }
+
     try {
       const { body } = await phin({
         url: recaptchaURI(secret, req.body.gresponse),
@@ -34,11 +36,9 @@ const verifyRecaptcha = function (secret) {
       if (body.success) return next();
       if (body["error-codes"].length) {
         const errors = body["error-codes"];
-        console.log(errors);
         return res.status(500).send(errors);
       }
     } catch (err) {
-      console.log(err);
       next(err);
     }
   };

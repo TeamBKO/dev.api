@@ -25,8 +25,8 @@ class Testimony extends cursor(guid(dateMixin(Model))) {
         author: { type: "string" },
         avatar: { type: "string" },
         text: { type: "text" },
-        created_at: { type: "date" },
-        updated_at: { type: "date" },
+        created_at: { type: "string" },
+        updated_at: { type: "string" },
       },
     };
   }

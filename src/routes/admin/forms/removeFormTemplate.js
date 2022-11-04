@@ -3,10 +3,10 @@ const Form = require("$models/Form");
 
 const guard = require("express-jwt-permissions")();
 const redis = require("$services/redis");
+const { deleteCacheByPattern } = require("$services/redis/helpers");
 const { query } = require("express-validator");
 const { validate } = require("$util");
 const { VIEW_ALL_ADMIN, DELETE_ALL_FORMS } = require("$util/policies");
-const { transaction } = require("objection");
 
 const removeForm = async function (req, res, next) {
   const trx = await Form.startTransaction();
@@ -17,11 +17,26 @@ const removeForm = async function (req, res, next) {
       .del()
       .returning("id");
 
-    const pipeline = redis.pipeline();
+    /** FLUSH THE CACHE */
+    let keys = [];
+    // const pipeline = redis.pipeline();
 
-    req.query.ids.forEach((id) => pipeline.del(`form_${id}`));
+    req.query.ids.forEach((id) => {
+      // pipeline.del(`form:${id}`);
+      // pipeline.del(`admin:form:${id}`);
+      keys.push(`form:${id}`);
+      keys.push(`admin:form:${id}`);
+    });
 
-    pipeline.exec();
+    await redis.unlink(keys);
+
+    // pipeline.exec();
+
+    deleteCacheByPattern("admin:forms:*");
+    deleteCacheByPattern("forms:*");
+
+    /** END OF CACHE FLUSH */
+
     await trx.commit();
 
     res.status(200).send(deleted);

@@ -14,39 +14,34 @@ const getAllRoles = async function (req, res, next) {
   const settings = await getCachedSettings();
 
   const roleQuery = Role.query()
+    .where("level", ">=", req.user.level)
     .select([
       select,
-      Role.relatedQuery("users")
-        .count("users.id")
-        .as("members")
-        .whereColumn("roles.id", "user_roles.role_id"),
+      // Role.relatedQuery("users")
+      //   .count("users.id")
+      //   .as("members")
+      //   .whereColumn("roles.id", "user_roles.role_id"),
     ])
     .orderBy("created_at", "desc")
     .orderBy("id");
 
   let query = null;
-
+  const securityLevel = req.user.level;
   if (nextCursor) {
     const next = nextCursor.split(".")[0];
     query = await getCachedQuery(
-      `rosters:${next}`,
+      `roles:${securityLevel}:${next}`,
       roleQuery.clone().cursorPage(nextCursor),
       settings.cache_on_roles_fetch
     );
     roles;
   } else {
     query = await getCachedQuery(
-      "rosters:first",
+      `roles:${securityLevel}:first`,
       roleQuery.clone().cursorPage(),
       settings.cache_on_roles_fetch
     );
   }
-
-  // if (nextCursor) {
-  //   query = await roleQuery.clone().cursorPage(nextCursor);
-  // } else {
-  //   query = await roleQuery.clone().cursorPage();
-  // }
 
   res.status(200).send(query);
 };

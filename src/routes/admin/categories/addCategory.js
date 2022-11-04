@@ -33,7 +33,7 @@ const addCategory = async function (req, res, next) {
 
     await trx.commit();
 
-    deleteKeysByPattern("categories:");
+    deleteKeysByPattern("?(categories*)");
 
     res.status(200).send(category);
   } catch (err) {

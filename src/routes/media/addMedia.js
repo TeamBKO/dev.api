@@ -4,7 +4,6 @@ const guard = require("express-jwt-permissions")();
 const { deleteCacheByPattern } = require("$services/redis/helpers");
 const { uploadFiles } = require("$services/upload");
 const { ADD_ALL_MEDIA } = require("$util/policies");
-const redis = require("$services/redis");
 
 const uploadFileMiddleware = async (req, res, next) => {
   const upload = uploadFiles({
@@ -50,8 +49,8 @@ const uploadMedia = async function (req, res, next) {
         result.map(({ id }) => id)
       );
 
-    deleteCacheByPattern(`media:${req.user.id}:`);
-    await redis.del(`media:${req.user.id}:first`);
+    deleteCacheByPattern(`media:${req.user.id}*`);
+
     res.status(200).send(media);
   } catch (err) {
     await trx.rollback();

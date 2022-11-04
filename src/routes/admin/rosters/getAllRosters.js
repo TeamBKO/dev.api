@@ -77,14 +77,14 @@ const getAllRosters = async function (req, res) {
   if (nextCursor) {
     const next = nextCursor.split(".")[0];
     query = await getCachedQuery(
-      `rosters:${next}`,
+      `admin:rosters:${next}`,
       rosterQuery.clone().cursorPage(nextCursor),
       settings.cache_rosters_on_fetch,
       filters
     );
   } else {
     query = await getCachedQuery(
-      "rosters:first",
+      "admin:rosters:first",
       rosterQuery.clone().cursorPage(),
       settings.cache_rosters_on_fetch,
       filters

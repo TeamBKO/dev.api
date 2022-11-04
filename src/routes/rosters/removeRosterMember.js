@@ -1,7 +1,10 @@
 "use strict";
 const RosterMember = require("$models/RosterMember");
+const Roster = require("$models/Roster");
+const DiscordMessage = require("$services/discord/classes/DiscordMessage");
+const emitter = require("$services/redis/emitter");
+const Settings = require("$models/Settings");
 const sanitize = require("sanitize-html");
-const redis = require("$services/redis");
 
 const { param, query } = require("express-validator");
 const { validate } = require("$util");
@@ -10,6 +13,11 @@ const { deleteCacheByPattern } = require("$services/redis/helpers");
 const validators = validate([
   param("id")
     .optional()
+    .isUUID()
+    .trim()
+    .escape()
+    .customSanitizer((v) => sanitize(v)),
+  param("rosterId")
     .isUUID()
     .trim()
     .escape()
@@ -38,22 +46,49 @@ const removeRosterMember = async function (req, res, next) {
     return res.status(403).send("Insufficient privilages.");
   }
 
+  const rosterId = req.params.rosterId;
+
+  const [settings, roster] = await Promise.all([
+    Settings.query().select(["enable_bot", "bot_server_id"]).first(),
+    Roster.query()
+      .where("id", rosterId)
+      .select("link_to_discord")
+      .first()
+      .throwIfNotFound(),
+  ]);
+
+  const discordBotEnabled =
+    settings.enable_bot && settings.bot_server_id && roster.link_to_discord;
+
   const trx = await RosterMember.startTransaction();
   let query = RosterMember.query(trx)
+    .where("is_deletable", true)
+    .joinRelated("member(defaultSelects)")
     .del()
-    .first()
-    .returning(["id"])
-    .where("is_deletable", true);
+    .returning(["roster_members.id", "status", "member.username as username"]);
+
   query = req.params.id
-    ? query.where("roster_members.id", req.params.id)
-    : query.whereIn("roster_members.id", req.query.ids);
+    ? query.where("roster_members.id", req.params.id).first()
+    : query.whereIn("roster_members.id", req.body.ids);
 
   try {
     const items = await query;
+
+    if (discordBotEnabled) {
+      await DiscordMessage.remove(req.params.id);
+    }
+
     await trx.commit();
-    await redis.del(`roster:${hasAccess.roster_id}`);
-    deleteCacheByPattern(`members:${hasAccess.roster_id.split("-")[4]}:`);
-    deleteCacheByPattern("rosters:");
+
+    /** FLUCH CACHE */
+    deleteCacheByPattern(`?(admin:rosters:*|rosters:*|roster:${rosterId}*)`);
+    /**END OF CACHE */
+
+    emitter
+      .of("/rosters")
+      .to(`roster:${rosterId}`)
+      .volatile.emit("remove:members", items, req.body.source);
+
     res.status(200).send(items);
   } catch (err) {
     console.log(err);
@@ -63,7 +98,7 @@ const removeRosterMember = async function (req, res, next) {
 };
 
 module.exports = {
-  path: "/members/:id?",
+  path: "/:rosterId/members/:id?",
   method: "DELETE",
   middleware: [validators],
   handler: removeRosterMember,

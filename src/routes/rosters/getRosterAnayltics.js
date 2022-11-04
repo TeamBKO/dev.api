@@ -12,21 +12,6 @@ const dynamicColumnQuery = (field, req) => {
     .andWhere("field.multiple", field.multiple);
 
   if (field.multiple) {
-    // return query
-    //   .with("answers", (qb) =>
-    //     qb
-    //       .select(
-    //         raw(`*, jsonb_array_elements(answer->'value') AS ??)`, [
-    //           field.alias,
-    //         ])
-    //       )
-    //       .from("roster_form_fields")
-    //   )
-    //   .select(raw("??, COUNT (??) as members", ["answers", field.alias]))
-    //   .from("answers")
-    //   .debug()
-    //   .groupBy(field.alias);
-
     return query
       .select(
         raw(
@@ -49,11 +34,14 @@ const dynamicColumnQuery = (field, req) => {
 
 const getRosterAnalytics = async (req, res, next) => {
   const rosterId = req.params.id;
+  const formId = req.query.formId;
 
-  const { fields } = await Form.query()
+  const form = await Form.query()
     .withGraphJoined("[rosters, fields(useAsColumn)]")
     .where("rosters.id", rosterId)
     .first();
+
+  console.log("form", form);
 
   const joinedOnDate = RosterMember.query()
     .select(
@@ -73,15 +61,15 @@ const getRosterAnalytics = async (req, res, next) => {
     .where("roster_id", rosterId)
     .groupBy("status");
 
-  const queries = [
-    joinedOnDate,
-    memberComparison,
-    fields.map((field) => dynamicColumnQuery(field, req)),
-  ];
+  const queries = [joinedOnDate, memberComparison];
+
+  if (form && form.fields && form.fields.length) {
+    queries.push(
+      form.fields.map((field) => dynamicColumnQuery(field, req, formId))
+    );
+  }
 
   const data = await Promise.all(queries.flat());
-
-  console.log(data);
 
   res.status(200).send(data);
 };

@@ -21,9 +21,19 @@ const getAllTestimonies = async function (req, res, next) {
   let query;
 
   if (nextCursor) {
-    query = await testimonyQuery.clone().cursorPage(nextCursor);
+    const next = nextCursor.split(".")[0];
+    query = await getCachedQuery(
+      `admin:testimonies:${next}`,
+      testimonyQuery.clone().cursorPage(nextCursor),
+      true
+    );
   } else {
-    query = await testimonyQuery.clone().cursorPage();
+    query = await getCachedQuery(
+      "admin:testimonies:first",
+      testimonyQuery.clone().cursorPage(),
+      settings.cache_forms_on_fetch,
+      true
+    );
   }
 
   res.status(200).send(query);

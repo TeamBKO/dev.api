@@ -1,5 +1,5 @@
 "use strict";
-const BotWatched = require("$models/BotWatched");
+const DiscordWatchedRole = require("$models/DiscordWatchedRole");
 const {
   VIEW_ALL_ADMIN,
   UPDATE_ALL_SETTINGS,
@@ -8,13 +8,13 @@ const {
 const { validate } = require("$util");
 
 const addWatchedDiscordRoles = async (req, res, next) => {
-  const trx = await BotWatched.startTransaction();
+  const trx = await DiscordWatchedRole.startTransaction();
   try {
-    const watched = await BotWatched.query()
+    const watched = await DiscordWatchedRole.query()
       .insert(req.body.watched)
       .returning("id");
     await trx.commit();
-    const results = await BotWatched.query()
+    const results = await DiscordWatchedRole.query()
       .joinRelated("discord_roles")
       .select(["id", "discord_roles.id", "discord_roles.name"])
       .whereIn(

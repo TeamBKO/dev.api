@@ -26,7 +26,7 @@ class UserSession extends guid(dateMixin(Model)) {
         user_id: { type: "integer" },
         token_id: { type: "string" },
         refresh_token_id: { type: "string" },
-        expires: { type: "date" },
+        // expires: { type: "date" },
         created_at: { type: "string" },
         updated_at: { type: "string" },
       },

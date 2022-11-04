@@ -70,6 +70,8 @@ const select = [
 const addForm = async function (req, res, next) {
   const { details, fields } = req.body;
 
+  console.log(fields);
+
   const insert = insertFn(req.user.id, details, fields);
 
   const trx = await Form.startTransaction();
@@ -85,7 +87,6 @@ const addForm = async function (req, res, next) {
       .where("forms.id", id)
       .first();
 
-    console.log(form);
     res.status(200).send(form);
   } catch (err) {
     console.log(err);

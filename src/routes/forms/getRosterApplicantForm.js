@@ -2,7 +2,10 @@
 const Form = require("$models/Form");
 const Roster = require("$models/Roster");
 const RosterMember = require("$models/RosterMember");
-const getCache = require("$util/getCache");
+const {
+  getCachedQuery,
+  getCachedSettings,
+} = require("$services/redis/helpers");
 const guard = require("express-jwt-permissions")();
 const sanitize = require("sanitize-html");
 const { param, query } = require("express-validator");
@@ -28,7 +31,7 @@ const validators = validate([
 const select = ["id", "name", "banner"];
 
 const getRecruitmentForm = async function (req, res, next) {
-  let response = {};
+  const settings = await getCachedSettings();
 
   try {
     if (!req.query.edit) {
@@ -51,14 +54,16 @@ const getRecruitmentForm = async function (req, res, next) {
       }
     }
 
-    let { roster_form, ...roster } = await getCache(
-      `r_form_${req.params.id}`,
+    let { roster_form, ...roster } = await getCachedQuery(
+      `roster:form:${req.params.id}`,
       Roster.query()
         .withGraphFetched("roster_form(id).[fields(order)]")
         .where("id", req.params.id)
         .andWhere("enable_recruitment", true)
         .select(select)
-        .first()
+        .first(),
+      settings.cache_forms_on_fetch,
+      undefined
     );
 
     res.status(200).send({ form: roster_form, roster });

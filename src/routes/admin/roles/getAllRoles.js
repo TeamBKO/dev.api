@@ -31,6 +31,7 @@ const getAllRoles = async function (req, res, next) {
 
   const roleQuery = filterQuery(
     Role.query()
+      .where("level", ">=", req.user.level)
       .select(
         select,
         Role.relatedQuery("users")
@@ -45,18 +46,18 @@ const getAllRoles = async function (req, res, next) {
   );
 
   let query = null;
-
+  const securityLevel = req.user.level;
   if (nextCursor) {
     const next = nextCursor.split(".")[0];
     query = await getCachedQuery(
-      `roles:${next}`,
+      `admin:roles:${securityLevel}:${next}`,
       roleQuery.clone().cursorPage(nextCursor),
       settings.cache_roles_on_fetch,
       filters
     );
   } else {
     query = await getCachedQuery(
-      "roles:first",
+      `admin:roles:${securityLevel}:first`,
       roleQuery.clone().cursorPage(),
       settings.cache_roles_on_fetch,
       filters

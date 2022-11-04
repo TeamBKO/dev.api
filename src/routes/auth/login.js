@@ -46,13 +46,10 @@ const login = async function (req, res, next) {
     .where({ email: req.body.email, active: true })
     .select(select)
     .withGraphFetched("[roles.policies, policies]")
-    .throwIfNotFound()
     .first();
 
   if (!user) {
-    return res
-      .status(422)
-      .send({ message: "User doesn't exist or has not been activated." });
+    return res.status(422).send({ message: "Invalid credentails." });
   }
 
   if (!enable_user_authentication) {

@@ -27,8 +27,7 @@ const removeOwnMedia = async (req, res, next) => {
       .returning(["id"]);
 
     await trx.commit();
-    deleteCacheByPattern(`media:${req.user.id}:`);
-    await redis.del(`media:${req.user.id}:first`);
+    deleteCacheByPattern(`media:${req.user.id}*`);
 
     const deleted = results.map(({ id }) => id);
 

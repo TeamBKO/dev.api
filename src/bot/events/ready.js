@@ -1,5 +1,6 @@
 "use strict";
 const DiscordRole = require("$models/DiscordRole");
+const { getCachedSettings } = require("$services/redis/helpers");
 const Settings = require("$models/Settings");
 const { getDiscordRoles } = require("$util");
 

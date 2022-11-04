@@ -1,5 +1,5 @@
 "use strict";
-const BotWatched = require("$models/BotWatched");
+const DiscordWatchedRole = require("$models/DiscordWatchedRole");
 const {
   VIEW_ALL_ADMIN,
   UPDATE_ALL_SETTINGS,
@@ -9,9 +9,9 @@ const { validate } = require("$util");
 const redis = require("$services/redis");
 
 const unwatchDiscordRoles = async (req, res, next) => {
-  const trx = await BotWatched.startTransaction();
+  const trx = await DiscordWatchedRole.startTransaction();
   try {
-    const unwatched = await BotWatched.query()
+    const unwatched = await DiscordWatchedRole.query()
       .where("id", req.params.id)
       .del()
       .returning("id");

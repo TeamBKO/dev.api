@@ -1,9 +1,9 @@
 "use strict";
 const { Model } = require("objection");
 
-class BotWatched extends Model {
+class DiscordWatchedRole extends Model {
   static get tableName() {
-    return "bot_watched_roles";
+    return "discord_watched_roles";
   }
 
   static get jsonSchema() {
@@ -24,7 +24,7 @@ class BotWatched extends Model {
         relation: Model.HasOneRelation,
         modelClass: DiscordRoles,
         join: {
-          from: "bot_watched_roles.discord_role_id",
+          from: "discord_watched_roles.discord_role_id",
           to: "discord_roles.id",
         },
       },
@@ -32,4 +32,4 @@ class BotWatched extends Model {
   }
 }
 
-module.exports = BotWatched;
+module.exports = DiscordWatchedRole;

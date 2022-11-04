@@ -11,6 +11,10 @@ module.exports = async function authentiateSocketClient(socket) {
     try {
       verified = await verifyToken(token, process.env.JWT_REFRESH_SECRET);
 
+      if (await redis.exists(`blacklist:${verified.jti}`)) {
+        socket.disconnect(true);
+      }
+
       if (!verified) {
         socket.disconnect(true);
       }

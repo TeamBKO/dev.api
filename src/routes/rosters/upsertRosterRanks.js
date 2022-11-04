@@ -86,6 +86,8 @@ const upsertRosterRank = async function (req, res, next) {
     )
     .first();
 
+  const rosterId = req.params.id;
+
   if (!hasAccess) {
     return res.status(403).send("Insufficient privilages.");
   }
@@ -103,8 +105,6 @@ const upsertRosterRank = async function (req, res, next) {
 
   const data = upsert(req.params.id, rank, roster_id);
 
-  console.log(data);
-
   const trx = await RosterRank.startTransaction();
 
   try {
@@ -115,8 +115,7 @@ const upsertRosterRank = async function (req, res, next) {
 
     await trx.commit();
 
-    await redis.del(`roster:${hasAccess.roster_id}`);
-    deleteCacheByPattern(`members:${hasAccess.roster_id.split("-")[4]}:`);
+    deleteCacheByPattern(`roster:${rosterId}*`);
 
     const result = await RosterRank.query()
       .select(select)
@@ -132,7 +131,7 @@ const upsertRosterRank = async function (req, res, next) {
 };
 
 module.exports = {
-  path: "/rank/:id?",
+  path: "/:rosterId/rank/:id?",
   method: "PATCH",
   middleware: [
     (req, res, next) => {

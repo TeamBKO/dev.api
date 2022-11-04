@@ -3,6 +3,10 @@ const Form = require("$models/Form");
 const guard = require("express-jwt-permissions")();
 const sanitize = require("sanitize-html");
 const filterQuery = require("$util/filterQuery");
+const {
+  getCachedQuery,
+  getCachedSettings,
+} = require("$services/redis/helpers");
 const { query } = require("express-validator");
 const { validate } = require("$util");
 const { VIEW_ALL_ADMIN, VIEW_ALL_FORMS } = require("$util/policies");
@@ -17,13 +21,15 @@ const select = [
 ];
 
 const getAllFormTemplates = async function (req, res, next) {
+  const settings = await getCachedSettings();
+  const nextCursor = req.query.nextCursor;
+
   const filters = pick(req.query, [
     "limit",
     "exclude",
     "searchByName",
     "rosters.id",
   ]);
-  const nextCursor = req.query.nextCursor;
 
   let formQuery = filterQuery(
     Form.query()
@@ -42,10 +48,27 @@ const getAllFormTemplates = async function (req, res, next) {
   let forms;
 
   if (nextCursor) {
-    forms = await formQuery.clone().cursorPage(nextCursor);
+    const next = nextCursor.split(".")[0];
+    forms = await getCachedQuery(
+      `admin:forms:${next}`,
+      formQuery.clone().cursorPage(nextCursor),
+      settings.cache_forms_on_fetch,
+      filters
+    );
   } else {
-    forms = await formQuery.clone().cursorPage();
+    forms = await getCachedQuery(
+      "admin:forms:first",
+      formQuery.clone().cursorPage(),
+      settings.cache_forms_on_fetch,
+      filters
+    );
   }
+
+  // if (nextCursor) {
+  //   forms = await formQuery.clone().cursorPage(nextCursor);
+  // } else {
+  //   forms = await formQuery.clone().cursorPage();
+  // }
   console.log(forms);
 
   res.status(200).send(forms);

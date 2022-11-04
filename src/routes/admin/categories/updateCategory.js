@@ -2,10 +2,9 @@
 const Category = require("$models/Category");
 const guard = require("express-jwt-permissions")();
 const sanitize = require("sanitize-html");
-const redis = require("$services/redis");
+const { deleteCacheByPattern } = require("$services/redis/helpers");
 const { body, param } = require("express-validator");
 const { validate } = require("$util");
-const { transaction } = require("objection");
 const { VIEW_ALL_ADMIN } = require("$util/policies");
 
 const validators = validate([
@@ -35,14 +34,9 @@ const editCategory = async function (req, res, next) {
       .first()
       .returning("id", "name", "updated_at");
 
-    const pipeline = redis.pipeline();
-    pipeline.del(`r_form_${req.params.id}`);
-    pipeline.del("categories");
-    pipeline.del("recruit_categories");
-    pipeline.del("form_categories");
-
-    pipeline.exec();
     await trx.commit();
+
+    deleteCacheByPattern("categories*");
     res.status(200).send(category);
   } catch (err) {
     console.error(err);

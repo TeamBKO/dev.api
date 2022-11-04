@@ -1,4 +1,10 @@
 "use strict";
+/**
+ *
+ * @param {promise} query The unresolved promise to be filtered
+ * @param {object} filters An object holding key/value pairs to filter the query by
+ * @param {string} table The table prefix
+ */
 module.exports = function filterQuery(query, filters, table) {
   if (filters && Object.keys(filters).length) {
     Object.entries(filters).forEach(([key, val]) => {
@@ -9,7 +15,7 @@ module.exports = function filterQuery(query, filters, table) {
           /** Split PascalCase */
           const parts = identifier.trim().split(/(?=[A-Z])/);
 
-          if (parts.length > 1) {
+          if (parts && Array.isArray(parts) && parts.length > 1) {
             identifier = identifier.join(".");
           } else {
             identifier = parts[0];

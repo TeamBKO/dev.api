@@ -2,6 +2,7 @@
 const Testimony = require("$models/Testimony");
 const sanitize = require("sanitize-html");
 const guard = require("express-jwt-permissions")();
+const { deleteCacheByPattern } = require("$services/redis/helpers");
 const { body, param } = require("express-validator");
 const { validate } = require("$util");
 
@@ -29,17 +30,19 @@ const validators = validate([
 
 const middleware = [guards, validators];
 
-const patchTestimony = async function (req, res) {
+const updateTestimony = async function (req, res) {
   const testimony = await Testimony.query()
     .patch(req.body.testimony)
     .where("id", req.params.id);
 
-  res.status(200).send({ testimony });
+  deleteCacheByPattern("?(admin:testimonies*|testimonies*)");
+
+  res.status(200).send(testimony);
 };
 
 module.exports = {
   path: "/testimony/:id",
   method: "PATCH",
   middleware,
-  handler: patchTestimony,
+  handler: updateTestimony,
 };

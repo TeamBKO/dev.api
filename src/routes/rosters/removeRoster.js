@@ -46,10 +46,8 @@ const removeRoster = async function (req, res, next) {
       .throwIfNotFound();
 
     await trx.commit();
-
-    await redis.del(`roster:${req.params.id}`);
-    deleteCacheByPattern(`members:${req.params.id}:`);
-    deleteCacheByPattern("rosters:");
+    /** FLUSH THE CACHE FOR THE ROSTER(s) AND ASSOCIATED MEMBERS */
+    deleteCacheByPattern("rosters:*");
 
     await res.status(200).send(deleted);
   } catch (err) {

@@ -1,8 +1,7 @@
 "use strict";
 const Role = require("$models/Role");
 const User = require("$models/User");
-const BotWatched = require("$models/BotWatched");
-const redis = require("$services/redis");
+const DiscordWatchedRole = require("$models/DiscordWatchedRole");
 const { getCachedQuery } = require("$services/redis/helpers");
 
 class DiscordMember {
@@ -40,12 +39,11 @@ module.exports = {
 
     let watched = await getCachedQuery(
       `watched`,
-      BotWatched.query()
+      DiscordWatchedRole.query()
         .joinRelated("discord_roles")
         .select("discord_roles.discord_role_id as id"),
       true,
       undefined,
-      false,
       600
     );
 

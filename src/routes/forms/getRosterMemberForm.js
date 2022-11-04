@@ -20,6 +20,7 @@ const getRosterMemberForm = async (req, res, next) => {
   }
 
   const roster = await Roster.query()
+    .withGraphFetched("roster_form")
     .select(["name", "banner"])
     .where("id", rosterId)
     .first();
@@ -35,8 +36,6 @@ const getRosterMemberForm = async (req, res, next) => {
     ])
     .where("roster_member_forms.id", req.params.id)
     .first();
-
-  console.log("roster_member", form);
 
   res.status(200).send({ form, roster });
 };

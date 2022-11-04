@@ -1,7 +1,7 @@
 "use strict";
 const Roster = require("$models/Roster");
 const RosterMember = require("$models/RosterMember");
-const redis = require("$services/redis");
+const emitter = require("$services/redis/emitter");
 const pick = require("lodash.pick");
 const sanitize = require("sanitize-html");
 const hasScope = require("$util/hasScope");
@@ -37,17 +37,9 @@ const validators = validate([
   body("private").optional().isBoolean(),
   body("selectedForm").optional().isNumeric().toInt(10),
   body("roles.*").optional().isNumeric().toInt(10),
-  body("display_applicant_forms_on_discord").optional().isBoolean(),
+  body("link_to_discord").optional().isBoolean(),
   body("assign_discord_roles_on_approval").optional().isBoolean(),
-  body("approved_applicant_channel_id")
-    .optional()
-    .isString()
-    .customSanitizer((v) => sanitize(v)),
-  body("pending_applicant_channel_id")
-    .optional()
-    .isString()
-    .customSanitizer((v) => sanitize(v)),
-  body("rejected_applicant_channel_id")
+  body("applicant_form_channel_id")
     .optional()
     .isString()
     .customSanitizer((v) => sanitize(v)),
@@ -63,11 +55,8 @@ const generateGraph = (rosterId, body) => {
     "private",
     "is_disabled",
     "assign_discord_roles_on_approval",
-    "display_applicant_forms_on_discord",
-    "display_applicant_forms_on_discord",
-    "approved_applicant_channel_id",
-    "pending_applicant_channel_id",
-    "rejected_applicant_channel_id",
+    "link_to_discord",
+    "applicant_form_channel_id",
   ];
 
   keys.forEach((key) => {
@@ -77,81 +66,23 @@ const generateGraph = (rosterId, body) => {
   });
 
   if (!isUndefined(body.selectedForm)) {
-    Object.assign(results, { roster_form: { id: body.selectedForm } });
+    if (body.selectedForm) {
+      Object.assign(results, { roster_form: { id: body.selectedForm } });
+    } else {
+      Object.assign(results, { roster_form: null });
+    }
   }
 
-  if (body.roles && body.roles.length) {
-    Object.assign(results, { roles: body.roles.map((id) => ({ id })) });
+  if (!isUndefined(body.roles)) {
+    const roles = body.roles.length ? body.roles.map((id) => ({ id })) : [];
+    Object.assign(results, { roles });
   }
 
-  return results;
-
-  // if (!isUndefined(body.enable_recruitment)) {
-  //   Object.assign(results, { enable_recruitment: body.enable_recruitment });
-  // }
-
-  // if (!isUndefined(body.auto_approve)) {
-  //   Object.assign(results, { auto_approve: body.auto_approve });
-  // }
-
-  // if (!isUndefined(body.apply_roles_on_approval)) {
-  //   Object.assign(results, {
-  //     apply_roles_on_approval: body.apply_roles_on_approval,
-  //   });
-  // }
-
-  // if (!isUndefined(body.show_fields_as_columns)) {
-  //   Object.assign(results, {
-  //     show_fields_as_columns: body.show_fields_as_columns,
-  //   });
-  // }
-
-  // if (!isUndefined(body.private)) {
-  //   Object.assign(results, { private: body.private });
-  // }
-
-  // if (!isUndefined(body.is_disabled)) {
-  //   Object.assign(results, { is_disabled: body.is_disabled });
-  // }
-
-  // if (!isUndefined(body.selectedForm)) {
-  //   Object.assign(results, { roster_form: { id: body.selectedForm } });
-  // }
-
-  // if (body.roles && body.roles.length) {
+  // if (body.roles) {
   //   Object.assign(results, { roles: body.roles.map((id) => ({ id })) });
   // }
 
-  // if (!isUndefined(body.assign_discord_roles_on_approval)) {
-  //   Object.assign(results, {
-  //     assign_discord_roles_on_approval: body.assign_discord_roles_on_approval,
-  //   });
-  // }
-
-  // if (!isUndefined(body.display_applicant_forms_on_discord)) {
-  //   Object.assign(results, {
-  //     display_applicant_forms_on_discord:
-  //       body.display_applicant_forms_on_discord,
-  //   });
-  // }
-
-  // if (!isUndefined(body.approved_applicant_channel_id)) {
-  //   Object.assign(results, {
-  //     approved_applicant_channel_id: body.approved_applicant_channel_id,
-  //   });
-  // }
-
-  // if (!isUndefined(body.pending_applicant_channel_id)) {
-  //   Object.assign(results, {
-  //     pending_applicant_channel_id: body.pending_applicant_channel_id,
-  //   });
-  // }
-
-  // if (!isUndefined(body.rejected_applicant_channel_id)) {
-  //   Object.assign(results, {
-  //     rejected_applicant_channel_id: body.rejected_applicant_channel_id,
-  //   });
-  // }
+  return results;
 };
 
 const checkPermissions = async function (req, res, next) {
@@ -159,7 +90,7 @@ const checkPermissions = async function (req, res, next) {
     return next();
   }
   const hasAccess = await RosterMember.query()
-    .joinRelated("rank.[permissions], permissions")
+    .joinRelated("[rank.[permissions], permissions]")
     .where("roster_members.member_id", req.user.id)
     .andWhere((qb) => {
       qb.where("permissions.can_edit_roster_details", true).orWhere(
@@ -172,14 +103,14 @@ const checkPermissions = async function (req, res, next) {
   if (!hasAccess) {
     const err = new Error();
     err.message = "Insufficient Permissions";
-    err.stautsCode = "403";
+    err.statusCode = "403";
     return next(err);
   }
 
   next();
 };
 
-const addRoster = async function (req, res, next) {
+const updateRoster = async function (req, res, next) {
   const data = generateGraph(req.params.id, req.body);
 
   const columns = Object.keys(
@@ -188,14 +119,14 @@ const addRoster = async function (req, res, next) {
       "banner",
       "auto_approve",
       "enable_recruitment",
+      "auto_approve",
+      "apply_roles_on_approval",
       "show_fields_as_columns",
       "private",
-      "apply_roles_on_approval",
       "is_disabled",
       "assign_discord_roles_on_approval",
-      "approved_applicant_channel_id",
-      "pending_applicant_channel_id",
-      "rejected_applicant_channel_id",
+      "link_to_discord",
+      "applicant_form_channel_id",
     ])
   );
 
@@ -208,24 +139,30 @@ const addRoster = async function (req, res, next) {
       relate: ["roles", "roster_form"],
     });
 
+    // if (req.body.removeSelectedForm) {
+    //   await Roster.relatedQuery("roster_form", trx)
+    //     .for(req.params.id)
+    //     .unrelate();
+    // }
+
     await trx.commit();
 
     let query = Roster.query()
       .select(["id", "name", "url", "updated_at", ...columns])
+      .withGraphFetched("[roles, roster_form(default).[fields(useAsColumn)]]")
       .where("id", id)
       .first();
 
-    if (req.body.roles) {
-      query = query.withGraphFetched("[roles]");
-    }
-
-    if (req.body.selectedForm) {
-      query = query.withGraphFetched("[roster_form(default)]");
-    }
-
     const roster = await query;
-    await redis.del(`roster:${query.id}`);
-    deleteCacheByPattern("rosters:");
+
+    deleteCacheByPattern(`?(rosters:*|roster:${query.id}*)`);
+
+    emitter
+      .of("/rosters")
+      .to(`roster:${req.params.id}`)
+      .emit("update:settings", roster);
+
+    emitter.of("/rosters-index").emit("update:roster", roster);
 
     res.status(200).send(roster);
   } catch (err) {
@@ -240,11 +177,11 @@ module.exports = {
   method: "PATCH",
   middleware: [
     (req, res, next) => {
-      console.log(req.body);
+      console.log("settings", req.body);
       next();
     },
     checkPermissions,
     validators,
   ],
-  handler: addRoster,
+  handler: updateRoster,
 };

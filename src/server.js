@@ -10,11 +10,13 @@ const sub = redis.duplicate();
 
 const verifySocketToken = require("$services/sockets/verifySocketToken");
 const authenticateSocketClient = require("$services/sockets/authenticateSocketClient");
+const setupRosterSockets = require("$services/sockets/setupRosterSockets");
 const onSignal = require("$util/onSignal");
 
 const { Server } = require("socket.io");
 const { createAdapter } = require("@socket.io/redis-adapter");
 const { createTerminus } = require("@godaddy/terminus");
+const { verify } = require("crypto");
 
 const startServer = async function () {
   const server = http.createServer(await bootstrapApp());
@@ -28,6 +30,12 @@ const startServer = async function () {
   io.adapter(createAdapter(redis, sub));
 
   const indexAdapter = io.of("/index").adapter;
+  const rosterAdapter = io.of("/rosters");
+
+  io.of("/rosters").use(verifySocketToken).on("connection", setupRosterSockets);
+  io.of("/rosters-index")
+    .use(verifySocketToken)
+    .on("connection", () => {});
 
   io.of("/index")
     .use(verifySocketToken)

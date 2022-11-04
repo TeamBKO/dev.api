@@ -33,7 +33,7 @@ const addRole = async function (req, res, next) {
 
     role.members = 0;
 
-    deleteCacheByPattrn("roles:");
+    deleteCacheByPattern("?(admin:roles*|roles*)");
 
     res.status(200).send(role);
   } catch (err) {

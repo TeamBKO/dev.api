@@ -47,10 +47,6 @@ const updateUser = async (req, res, next) => {
     if (shouldRevokeToken(req)) {
       const sessions = await getUserSessions(req.params.id);
       if (sessions && sessions.length) await redis.multi(sessions).exec();
-      emitter
-        .of("/index")
-        .to(`user:${req.params.id}`)
-        .emit("account-change", true);
     }
 
     await trx.commit();
@@ -66,11 +62,9 @@ const updateUser = async (req, res, next) => {
     .where("id", req.params.id)
     .first();
 
-  await redis.del(`user:${req.params.id}`);
-  await redis.del(`me:${req.params.id}`);
-  deleteCacheByPattern("users:");
-
-  console.log(user);
+  deleteCacheByPattern(
+    `?(admin:users*|users*|user:${req.params.id}|me:${req.params.id})`
+  );
 
   res.status(200).send(user);
 };

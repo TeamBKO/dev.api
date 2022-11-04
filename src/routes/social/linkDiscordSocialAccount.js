@@ -3,12 +3,15 @@ const User = require("$models/User");
 const Settings = require("$models/Settings");
 const Role = require("$models/Role");
 const DiscordClient = require("$services/discord");
+const DiscordGuildMember = require("$services/discord/types/guildMember");
+
 const redis = require("$services/redis");
 const emitter = require("$services/redis/emitter");
 const sanitize = require("sanitize-html");
+const bot = require("$bot");
 const { body } = require("express-validator");
 const { validate } = require("$util");
-const { transaction } = require("objection");
+const { RESTJSONErrorCodes } = require("discord.js");
 
 const redirect_uri = "http://localhost:3000/social/discord";
 
@@ -76,22 +79,35 @@ const linkDiscordSocialAccount = async (req, res, next) => {
     const queryData = { id: parseInt(req.user.id, 10), discord_id: dUser.id };
 
     if (settings.enable_bot && settings.bot_server_id) {
-      const guildMember = await client.getGuildMember(
-        process.env.DISCORD_BOT_TOKEN,
-        settings.bot_server_id,
-        dUser.id
-      );
+      const guild = await bot.guilds.cache.get(settings.bot_server_id);
+      /** IF BOT IS ENABLED CHECK AND SEE IF THE DISCORD ACCOUNT IS A GUILD MEMBER */
+      try {
+        const guildMember = await guild.members.fetch(dUser.id);
+        if (guildMember) {
+          const gm = new DiscordGuildMember(guildMember);
+          const roles = await Role.query()
+            .joinRelated("discord_roles")
+            .select("roles.id as id")
+            .whereIn("discord_role_id", gm._roles);
 
-      const roles = await Role.query()
-        .joinRelated("discord_roles")
-        .select("roles.id as id")
-        .whereIn("discord_role_id", guildMember._roles);
-
-      if (roles && roles.length) {
-        Object.assign(queryData, {
-          roles: roles.map(({ id }) => ({ id, assigned_by: "discord" })),
-        });
+          if (roles && roles.length) {
+            Object.assign(queryData, {
+              roles: roles.map(({ id }) => ({ id, assigned_by: "discord" })),
+            });
+          }
+        }
+      } catch (err) {
+        /** IF IT'S NOT A DISCORD MEMBER WE IGNORE THE ERROR THROWN */
+        if (err.code !== RESTJSONErrorCodes.UnknownMember) {
+          next(err);
+        }
       }
+
+      // const guildMember = await client.getGuildMember(
+      //   process.env.DISCORD_BOT_TOKEN,
+      //   settings.bot_server_id,
+      //   dUser.id
+      // );
     }
 
     await User.query(trx).upsertGraph(queryData, options);

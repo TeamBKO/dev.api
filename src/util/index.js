@@ -2,44 +2,34 @@
 const { validationResult } = require("express-validator");
 const jwt = require("jsonwebtoken");
 const phin = require("phin");
-const getCache = require("$util/getCache");
 
 const isUndefined = () => val === undefined;
-
-const getQueryResults = async (key, query, hasFilters) => {
-  if (isUndefined(hasFilters)) {
-    return query;
-  }
-  return getCache(key, query);
-};
 
 const shouldRevokeToken = (req) => {
   const { addPolicies, removePolicies, addRoles, removeRoles } = req.body;
 
-  // return (
-  //   (addPolicies && Array.isArray(addPolicies) && addPolicies.length) ||
-  //   (removePolicies &&
-  //     Array.isArray(removePolicies) &&
-  //     removePolicies.length) ||
-  //   (addRoles && Array.isArray(addRoles) && addRoles.length) ||
-  //   (removeRoles && Array.isArray(removeRoles) && removeRoles.length)
-  // );
+  const policiesAdded = addPolicies && Array.isArray(addPolicies);
+  const policiesRemoved = removePolicies && Array.isArray(removePolicies);
+  const rolesAdded = addRoles && Array.isArray(addRoles);
+  const rolesRemoved = removeRoles && Array.isArray(removeRoles);
 
-  if (
-    (addPolicies && Array.isArray(addPolicies)) ||
-    (removePolicies && Array.isArray(removePolicies))
-  ) {
-    return true;
-  }
+  return policiesAdded || policiesRemoved || rolesAdded || rolesRemoved;
 
-  if (
-    (addRoles && Array.isArray(addRoles)) ||
-    (removeRoles && Array.isArray(removeRoles))
-  ) {
-    return true;
-  }
+  // if (
+  //   (addPolicies && Array.isArray(addPolicies)) ||
+  //   (removePolicies && Array.isArray(removePolicies))
+  // ) {
+  //   return true;
+  // }
 
-  return false;
+  // if (
+  //   (addRoles && Array.isArray(addRoles)) ||
+  //   (removeRoles && Array.isArray(removeRoles))
+  // ) {
+  //   return true;
+  // }
+
+  // return false;
 };
 
 const _formatDiscordRoles = (roles) => {
@@ -170,5 +160,4 @@ module.exports = {
   checkIfRolesExist,
   shouldRevokeToken,
   isUndefined,
-  getQueryResults,
 };

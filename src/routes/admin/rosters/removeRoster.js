@@ -2,7 +2,7 @@
 const Roster = require("$models/Roster");
 const guard = require("express-jwt-permissions")();
 const sanitize = require("sanitize-html");
-
+const { deleteCacheByPattern } = require("$services/redis/helpers");
 const { query } = require("express-validator");
 const { validate } = require("$util");
 
@@ -22,10 +22,8 @@ const middleware = [
 const removeRoster = async function (req, res, next) {
   const trx = await Roster.startTransaction();
 
-  let deleted;
-
   try {
-    deleted = await Roster.query(trx)
+    const deleted = await Roster.query(trx)
       .whereIn("id", req.query.ids)
       .andWhere("is_deletable", true)
       .throwIfNotFound()
@@ -33,6 +31,8 @@ const removeRoster = async function (req, res, next) {
       .returning(["id", "name"]);
 
     await trx.commit();
+
+    deleteCacheByPattern(`?(rosters*|roster*)`);
 
     res.status(200).send(deleted);
   } catch (err) {

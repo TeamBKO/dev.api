@@ -66,8 +66,6 @@ const getRosterRanks = async function (req, res, next) {
     query = await rankQuery.clone().cursorPage();
   }
 
-  console.log(query);
-
   res.status(200).send(query);
 };
 

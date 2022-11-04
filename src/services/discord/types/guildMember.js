@@ -15,13 +15,11 @@ const User = require("./user");
  */
 
 class GuildMember {
-  constructor({ user, nick, roles, joined_at, deaf, muted }) {
+  constructor({ user, nickname, _roles, joinedTimestamp }) {
     this._user = new User(user);
-    this._nick = nick;
-    this._roles = roles;
-    this._joined_at = joined_at;
-    this._deaf = deaf;
-    this._muted = muted;
+    this._nick = nickname;
+    this._roles = _roles;
+    this._joined_at = joinedTimestamp;
   }
 
   get user() {
@@ -44,14 +42,6 @@ class GuildMember {
 
   get joinedAt() {
     return this_.joined_at;
-  }
-
-  get deaf() {
-    return this._deaf;
-  }
-
-  get mute() {
-    return this._muted;
   }
 
   /**

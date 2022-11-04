@@ -2,10 +2,12 @@
 const Roster = require("$models/Roster");
 const RosterMember = require("$models/RosterMember");
 const sanitize = require("sanitize-html");
+const massageMemberData = require("$util/massageMemberData");
 
 const { param } = require("express-validator");
 const { validate } = require("$util");
 const {
+  getCachedQuery,
   getCachedObject,
   getCachedSettings,
 } = require("$services/redis/helpers");
@@ -30,11 +32,8 @@ const select = [
   "enable_recruitment",
   "is_disabled",
   "private",
-  "assign_discord_roles_on_approval",
-  "approved_applicant_channel_id",
-  "pending_applicant_channel_id",
-  "rejected_applicant_channel_id",
-  "display_applicant_forms_on_discord",
+  "applicant_form_channel_id",
+  "link_to_discord",
 ];
 
 const memberSelect = [
@@ -60,28 +59,22 @@ const getRoster = async function (req, res, next) {
       .first(),
   ]);
 
-  // let roster = await Roster.query()
-  //   .withGraphFetched(
-  //     "[roster_form(default).[fields(useAsColumn)], ranks(default), roles(nameAndId)]"
-  //   )
-  //   .select(select)
-  //   .where("url", req.params.slug)
-  //   .throwIfNotFound()
-  //   .first();
+  let eager = "[rank(default), forms(default).[fields(useAsColumn)]]";
 
-  const membersQuery = RosterMember.query()
+  // let eager = "[rank(default), form(default).[fields(useAsColumn)]]";
+
+  let membersQuery = RosterMember.query()
     .joinRelated("member(defaultSelects)")
     .select(memberSelect)
     .where("status", "approved")
     .andWhere("roster_id", roster.id)
-    .withGraphFetched("[rank(default), form(default).[fields(useAsColumn)]]")
+    .withGraphFetched(eager)
     .orderBy("roster_members.roster_rank_id", "asc")
     .orderBy("roster_members.id")
     .limit(25)
     .cursorPage();
 
   const memberQuery = RosterMember.query()
-    // .joinRelated("member(defaultSelects")
     .withGraphFetched(
       "[rank(default).[permissions(default)], permissions(default)]"
     )
@@ -90,13 +83,22 @@ const getRoster = async function (req, res, next) {
     .andWhere("member_id", req.user.id)
     .first();
 
-  let [members, member] = await Promise.all([membersQuery, memberQuery]);
+  const cacheID = roster.id.split("-")[4];
 
-  roster = await getCachedObject(
-    `roster:${roster.id}`,
-    Object.assign(roster, { members, member }),
-    settings.cache_rosters_on_fetch
-  );
+  let [members, member] = await Promise.all([
+    getCachedQuery(
+      `roster:${cacheID}:members:approved:first`,
+      membersQuery,
+      settings.cache_rosters_on_fetch
+    ),
+    memberQuery,
+  ]);
+
+  members.results = members.results.map(massageMemberData);
+
+  console.log(roster);
+
+  roster = Object.assign(roster, { members, member });
 
   res.status(200).send(roster);
 };

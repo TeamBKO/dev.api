@@ -35,7 +35,6 @@ const getCachedQuery = async function (
   query,
   shouldCache = true,
   filters = undefined,
-  pagination = true,
   ttl = 60
 ) {
   if (!isUndefined(filters) || !isObjectEmpty(filters)) return query;
@@ -101,25 +100,43 @@ const getCachedSettings = function (select, ttl = 60) {
     Settings.query().select(s).first(),
     true,
     undefined,
-    false,
     ttl
   );
 };
 
+const getResultsByPattern = (pattern) => {
+  return new Promise((resolve, reject) => {
+    const stream = redis.scanStream({
+      match: pattern,
+      count: 100,
+    });
+    const items = [];
+    stream.on("data", (keys) => {
+      if (keys.length) {
+        keys.forEach((key) => {
+          if (!items.includes(key)) {
+            items.push(key);
+          }
+        });
+      }
+    });
+    stream.on("end", () => resolve(keys));
+  });
+};
+
 const deleteCacheByPattern = (pattern) => {
-  const stream = redis.scanStream({ match: pattern, count: 50 });
-  const pipe = redis.pipeline();
+  const stream = redis.scanStream({ match: pattern, count: 100 });
   stream.on("data", (keys) => {
     if (keys.length) {
-      keys.forEach((key) => pipe.del(key));
+      redis.unlink(keys);
     }
   });
-  stream.on("end", () => pipe.exec());
 };
 
 module.exports = {
   getCachedQuery,
   getCachedObject,
   getCachedSettings,
+  getResultsByPattern,
   deleteCacheByPattern,
 };

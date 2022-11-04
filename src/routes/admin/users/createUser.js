@@ -135,9 +135,7 @@ const createUser = async function (req, res, next) {
       filters
     );
 
-    console.log("user", user);
-
-    deleteCacheByPattern("users:");
+    deleteCacheByPattern("?(admin:users*|users*)");
 
     res.status(200).send(user);
   } catch (err) {

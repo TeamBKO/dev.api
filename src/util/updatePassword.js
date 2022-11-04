@@ -4,6 +4,12 @@ const User = require("$models/User");
 const bcrypt = require("bcrypt");
 const SALT_ROUNDS = 12;
 
+/**
+ * Process a password update/recovery request.
+ * @param {object} req The request object.
+ * @param {object} res The response object.
+ * @param {function} next Moves request down the pipeline.
+ */
 module.exports = async function updatePassword(req, res, next) {
   const id = req.user ? req.user.id : req.body.id,
     code = req.user ? req.params.code : req.body.code,

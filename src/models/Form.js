@@ -17,6 +17,7 @@ class Form extends cursor(dateMixin(Model)) {
     return {
       default: (qb) => qb.select("id", "name"),
       id: (qb) => qb.select(["id as form_id", "description"]),
+      formIdOnly: (qb) => qb.select("id"),
     };
   }
 
@@ -27,7 +28,6 @@ class Form extends cursor(dateMixin(Model)) {
       properties: {
         id: { type: "integer" },
         creator_id: { type: "integer" },
-        // category_id: { type: "integer" },
         name: { type: "string" },
         created_at: { type: "string" },
         updated_at: { type: "string" },

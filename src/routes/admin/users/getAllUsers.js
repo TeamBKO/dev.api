@@ -55,21 +55,19 @@ const getAllUsers = async function (req, res, next) {
   if (nextCursor) {
     const next = nextCursor.split(".")[0];
     query = await getCachedQuery(
-      `users:${next}`,
+      `admin:users:${next}`,
       userQuery.clone().cursorPage(nextCursor),
       settings.cache_users_on_fetch,
       filters
     );
   } else {
     query = await getCachedQuery(
-      "users:first",
+      "admin:users:first",
       userQuery.clone().cursorPage(),
       settings.cache_users_on_fetch,
       filters
     );
   }
-
-  console.log(query.results.length);
 
   res.status(200).send(query);
 };

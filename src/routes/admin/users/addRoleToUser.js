@@ -39,9 +39,7 @@ const addRoleToUser = async function (req, res, next) {
     }
 
     await trx.commit();
-    deleteCacheByPattern("users:");
-    await redis.del(`user:${userId}`);
-    await redis.del(`me:${userId}`);
+    deleteCacheByPattern(`?(admin:users*|users*|user:${userId}|me:${userId})`);
 
     const payload = {
       user_id: user.user_id,

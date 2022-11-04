@@ -20,16 +20,21 @@ const validators = validate([
 
 const middleware = [guards, validators];
 
-const addTestimony = async function (req, res) {
-  const { total } = await Testimony.query().count();
-
+const addTestimony = async function (req, res, next) {
   const data = pick(req.body.testimony, ["author", "avatar", "text"]);
 
   const trx = await Testimony.startTransaction();
 
-  const testimony = await Testimony.query(trx).insert(data).returning("id");
+  try {
+    const testimony = await Testimony.query(trx).insert(data).returning("id");
 
-  res.status(200).send(testimony);
+    await trx.commit();
+
+    res.status(200).send(testimony);
+  } catch (err) {
+    await trx.rollback();
+    next(err);
+  }
 };
 
 module.exports = {

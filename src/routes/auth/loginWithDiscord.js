@@ -3,16 +3,18 @@ const UserSession = require("$models/UserSession");
 const User = require("$models/User");
 const Settings = require("$models/Settings");
 const Role = require("$models/Role");
+const DiscordGuildMember = require("$services/discord/types/guildMember");
 const jwt = require("jsonwebtoken");
 const DiscordClient = require("$services/discord");
 const redis = require("$services/redis");
 const bcrypt = require("bcrypt");
 const SALT_ROUNDS = 12;
 const generateTokenData = require("$util/generateTokenData");
+const bot = require("$root/src/bot");
+const uniq = require("lodash.uniq");
 const { body } = require("express-validator");
 const { nanoid } = require("nanoid");
 const { validate } = require("$util");
-const { transaction } = require("objection");
 
 const redirect_uri = process.env.BASE_URL;
 // const redirect_uri = "http://localhost:3000"
@@ -70,30 +72,31 @@ const loginWithDiscord = async (req, res, next) => {
       let roles = [{ id: 2, assigned_by: "site" }];
 
       if (settings.enable_bot && settings.bot_server_id) {
-        const guildMember = await client.getGuildMember(
-          process.env.DISCORD_BOT_TOKEN,
-          settings.bot_server_id,
-          dUser.id
-        );
-
-        const discordAssignedRoles = await Role.query()
-          .joinRelated("discord_roles")
-          .select("roles.id as id")
-          .whereIn("discord_role_id", guildMember._roles);
-
-        console.log(discordAssignedRoles);
-
-        if (discordAssignedRoles && discordAssignedRoles.length) {
-          /** grab the role ids assigned by discord, filter out any duplicate ids using uniqBy */
-          roles = [
-            ...roles,
-            ...discordAssignedRoles.map(({ id }) => ({
-              id,
-              assigned_by: "discord",
-            })),
-          ];
-
-          console.log(roles);
+        const guild = await bot.guilds.cache.get(settings.bot_server_id);
+        const guildMember = await guild.members.fetch(dUser.id);
+        try {
+          if (guildMember) {
+            const gm = new DiscordGuildMember(guildMember);
+            const discordAssignedRoles = await Role.query()
+              .joinRelated("discord_roles")
+              .select("roles.id as id")
+              .whereIn("discord_role_id", gm._roles);
+            if (discordAssignedRoles && discordAssignedRoles.length) {
+              /** grab the role ids assigned by discord, filter out any duplicate ids using uniqBy */
+              roles = uniq([
+                ...roles,
+                ...discordAssignedRoles.map(({ id }) => ({
+                  id,
+                  assigned_by: "discord",
+                })),
+              ]);
+              console.log(roles);
+            }
+          }
+        } catch (err) {
+          if (err.code !== RESTJSONErrorCodes.UnknownMember) {
+            next(err);
+          }
         }
       }
 

@@ -29,7 +29,7 @@ const select = [
   "member.id as userID",
 ];
 
-const getRosterRank = async function (req, res, next) {
+const getRosterMember = async function (req, res, next) {
   const getRanks = req.query.getRanks; //for fetch ranks on the initial request.
   const hasAccess = await RosterMember.query()
     .joinRelated("[permissions, rank.[permissions]]")
@@ -79,5 +79,5 @@ module.exports = {
     },
     validators,
   ],
-  handler: getRosterRank,
+  handler: getRosterMember,
 };

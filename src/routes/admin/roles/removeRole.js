@@ -29,19 +29,13 @@ const removeRole = async function (req, res, next) {
       .delete();
 
     if (deleted) {
-      console.log("deleted", deleted);
-      const pipeline = redis.pipeline();
-      req.query.ids.forEach((id) => pipeline.del(`role_${id}`));
-
       const sessions = await getUserSessionsByRoleID(req.query.ids);
       if (sessions && sessions.length) await redis.multi(sessions).exec();
-
-      pipeline.exec();
     }
 
     await trx.commit();
-    deleteCacheByPattern("role:");
-    deleteCacheByPattern("roles:");
+
+    deleteCacheByPattern("?(admin:roles*|roles*|role*)");
 
     res.status(200).send(deleted);
   } catch (err) {

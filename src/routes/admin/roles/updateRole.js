@@ -54,8 +54,6 @@ const updateRole = async (req, res, next) => {
 
   try {
     await Role.updateRole(req.params.id, req.body, trx);
-    await redis.del(`role:${req.params.id}`);
-    deleteCacheByPattern("roles:");
 
     if (shouldRevokeToken(req)) {
       const sessions = await getUserSessionsByRoleID(req.params.id);
@@ -67,6 +65,7 @@ const updateRole = async (req, res, next) => {
     }
 
     await trx.commit();
+    deleteCacheByPattern(`?(admin:roles*|roles*|role:${req.params.id}*)`);
 
     const role = await query
       .where("id", req.params.id)

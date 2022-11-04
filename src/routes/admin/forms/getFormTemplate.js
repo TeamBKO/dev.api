@@ -1,7 +1,10 @@
 "use strict";
 const Form = require("$models/Form");
 const guard = require("express-jwt-permissions")();
-const getCache = require("$util/getCache");
+const {
+  getCachedQuery,
+  getCachedSettings,
+} = require("$services/redis/helpers");
 const { param } = require("express-validator");
 const { validate } = require("$util");
 const { VIEW_ALL_ADMIN, VIEW_ALL_FORMS } = require("$util/policies");
@@ -9,14 +12,18 @@ const { VIEW_ALL_ADMIN, VIEW_ALL_FORMS } = require("$util/policies");
 const validators = validate([param("id").isNumeric().toInt(10)]);
 
 const getSingleForm = async function (req, res, next) {
-  const form = await getCache(
-    `form_${req.params.id}`,
+  const settings = await getCachedSettings();
+
+  const form = await getCachedQuery(
+    `admin:form:${req.params.id}`,
     Form.query()
       .withGraphFetched("[fields(order)]")
       .select("id", "name", "description")
       .where("id", req.params.id)
       .first()
-      .throwIfNotFound()
+      .throwIfNotFound(),
+    settings.cache_forms_on_fetch,
+    undefined
   );
 
   console.log(form);

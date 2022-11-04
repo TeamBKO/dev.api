@@ -4,7 +4,6 @@ const UserRole = require("$models/UserRole");
 const redis = require("$services/redis");
 const emitter = require("$services/redis/emitter");
 const getUserSessionsByRoleID = require("$util/getUserSessionsByRoleID");
-const { transaction } = require("objection");
 
 const delinkDiscordSocialAccount = async (req, res, next) => {
   const trx = await User.startTransaction();

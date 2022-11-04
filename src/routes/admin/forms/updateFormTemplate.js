@@ -1,12 +1,12 @@
 "use strict";
 const Form = require("$models/Form");
-const Field = require("$models/Field");
 const uniq = require("lodash.uniq");
 const sanitize = require("sanitize-html");
 const guard = require("express-jwt-permissions")();
 const redis = require("$services/redis");
 const { body, param } = require("express-validator");
 const { validate } = require("$util");
+const { deleteCacheByPattern } = require("$services/redis/helpers");
 const { VIEW_ALL_ADMIN, UPDATE_ALL_FORMS } = require("$util/policies");
 
 const validators = validate([
@@ -83,15 +83,14 @@ const upsert = (id, details, fields) => {
 const updateForm = async function (req, res, next) {
   const { details, fields } = req.body;
 
-  console.log(req.body);
-
   const up = upsert(req.params.id, details, fields);
   const trx = await Form.startTransaction();
 
   try {
     const { id } = await Form.query(trx).upsertGraph(up);
 
-    await redis.del(`form_${id}`);
+    await redis.del(`admin:form:${id}`);
+    deleteCacheByPattern("admin:forms:");
 
     await trx.commit();
 

@@ -32,6 +32,8 @@ const removeRank = async function (req, res, next) {
     return res.status(403).send("Insufficient privilages.");
   }
 
+  const rosterId = hasAccess.roster_id;
+
   const trx = await RosterRank.startTransaction();
 
   try {
@@ -43,8 +45,7 @@ const removeRank = async function (req, res, next) {
       .returning(["id", "name"]);
     await trx.commit();
 
-    await redis.del(`roster:${hasAccess.roster_id}`);
-    deleteCacheByPattern(`members:${hasAccess.roster_id}:`);
+    deleteCacheByPattern(`roster:${rosterId}*`);
 
     res.status(200).send(item);
   } catch (err) {

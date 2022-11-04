@@ -85,7 +85,7 @@ exports.up = function (knex) {
           .references("id")
           .inTable("roles")
           .onDelete("CASCADE");
-        t.integer("native_discord_role_id")
+        t.uuid("native_discord_role_id")
           .references("id")
           .inTable("discord_roles")
           .onDelete("CASCADE");
@@ -94,9 +94,93 @@ exports.up = function (knex) {
     knex.schema.hasTable("discord_roles").then((exists) => {
       if (exists) return;
       return knex.schema.createTable("discord_roles", (t) => {
-        t.increments("id").primary();
+        t.uuid("id").primary();
         t.string("name");
         t.string("discord_role_id");
+      });
+    }),
+    knex.schema.hasTable("discord_message_drafts").then((exists) => {
+      if (exists) return;
+      return knex.schema.createTable("discord_message_drafts", (t) => {
+        t.uuid("id").primary();
+        t.string("uid");
+        t.string("name");
+        t.jsonb("body").nullable();
+        t.jsonb("meta").nullable();
+        t.boolean("private").default(true);
+        t.integer("author_id")
+          .references("users.id")
+          .onDelete("CASCADE")
+          .onUpdate("CASCADE");
+        t.timestamps();
+      });
+    }),
+    // knex.schema.hasTable("discord_emoji").then((exists) => {
+    //   if (exists) return;
+    //   return knex.schema.createTable("discord_emoji", (t) => {
+    //     t.uuid("id").primary();
+    //     t.string("snowflake_id").nullable();
+    //     t.string("guild_id").nullable();
+    //     t.string("unicode").nullable();
+    //     t.string("name").nullable();
+    //     t.string("group");
+    //     t.boolean("is_unicode").defaultTo(false);
+    //     t.boolean("require_colons").default(false);
+    //     t.boolean("animated").default(false);
+    //   });
+    // }),
+    // knex.schema.hasTable("discord_reaction_role_assignment").then((exists) => {
+    //   if (exists) return;
+    //   return knex.schema.createTable(
+    //     "discord_reaction_role_assignment",
+    //     (t) => {
+    //       t.uuid("emoji_id")
+    //         .references("discord_emoji.id")
+    //         .onUpdate("CASCADE")
+    //         .onDelete("CASCADE");
+    //       t.integer("discord_role_id")
+    //         .references("discord_roles.id")
+    //         .onUpdate("CASCADE")
+    //         .onDelete("CASCADE");
+    //     }
+    //   );
+    // }),
+    knex.schema.hasTable("discord_reaction_role_assignment").then((exists) => {
+      if (exists) return;
+      return knex.schema.createTable(
+        "discord_reaction_role_assignment",
+        (t) => {
+          t.integer("id").primary();
+          t.string("emoji");
+          t.uuid("discord_role_id")
+            .references("discord_roles.id")
+            .onUpdate("CASCADE")
+            .onDelete("CASCADE");
+          t.boolean("is_unicode").default(false);
+          t.boolean("animated").default(false);
+          t.boolean("require_colon").default(false);
+        }
+      );
+    }),
+    knex.schema.hasTable("discord_webhooks").then((exists) => {
+      if (exists) return;
+      return knex.schema.createTable("discord_webhooks", (t) => {
+        t.uuid("id").primary();
+        t.bigint("webhook_id");
+        t.bigint("webhook_token");
+        t.timestamps();
+      });
+    }),
+
+    knex.schema.hasTable("discord_messages").then((exists) => {
+      if (exists) return;
+      return knex.schema.createTable("discord_messages", (t) => {
+        t.uuid("id").primary();
+        t.string("message_id");
+        t.string("channel_id");
+        t.string("guild_id");
+        t.string("sent_via_webhook").default(false);
+        t.timestamps();
       });
     }),
     knex.schema.hasTable("role_policies").then((exists) => {
@@ -141,12 +225,6 @@ exports.up = function (knex) {
         .then(() => knex.raw(CREATE_TRIGGER));
     }),
 
-    // knex.raw(`CREATE RULE check_user_roles_for_duplicates AS ON INSERT TO user_roles
-    // WHERE NOT user_id = NEW.user_id AND WHERE NOT role_id = NEW.role_id
-    // DO INSERT INTO user_roles VALUES (NEW.role_id, NEW.user_id, assigned_by)`),
-    // knex.raw(
-    //   `CREATE RULE check_user_roles_for_duplicates AS ON INSERT TO user_roles WHERE user_id = NEW.user_id AND WHERE role_id = NEW.role_id DO NOTHING`
-    // ),
     knex.schema.hasTable("user_policies").then((exists) => {
       if (exists) return;
       return knex.schema.createTable("user_policies", (t) => {
@@ -232,18 +310,6 @@ exports.up = function (knex) {
       });
     }),
 
-    // knex.schema.hasTable("front_page_info").then((exists) => {
-    //   if (exists) return;
-    //   return knex.schema.createTable("front_page_info", (t) => {
-    //     t.increments("id").primary();
-    //     t.integer("order");
-    //     t.string("title");
-    //     t.string("text");
-    //     t.enum("position", ["left", "right"]).defaultTo("right");
-    //     t.string("image");
-    //     t.timestamps();
-    //   });
-    // }),
     // knex.schema.hasTable("events").then((exists) => {
     //   if (exists) return;
     //   return knex.schema.createTable("events", (t) => {
@@ -307,14 +373,31 @@ exports.up = function (knex) {
     //       .onDelete("CASCADE");
     //   });
     // }),
-    knex.schema.hasTable("bot_watched_roles").then((exists) => {
+    knex.schema.hasTable("discord_watched_roles").then((exists) => {
       if (exists) return;
-      return knex.schema.createTable("bot_watched_roles", (t) => {
+      return knex.schema.createTable("discord_watched_roles", (t) => {
         t.uuid("id").primary();
-        t.integer("discord_role_id")
+        t.uuid("discord_role_id")
           .references("discord_roles.id")
           .onUpdate("CASCADE")
           .onDelete("CASCADE");
+      });
+    }),
+    knex.schema.hasTable("discord_applicant_forms").then((exists) => {
+      if (exists) return;
+      return knex.schema.createTable("discord_applicant_forms", (t) => {
+        t.uuid("id").primary();
+        t.uuid("roster_member_form_id")
+          .references("roster_member_forms.id")
+          .onUpdate("CASCADE")
+          .onDelete("CASCADE");
+        t.uuid("applicant_id")
+          .references("roster_members.id")
+          .onUpdate("CASCADE")
+          .onDelete("CASCADE");
+        t.string("message_id");
+        t.string("channel_id");
+        t.string("guild_id");
       });
     }),
     knex.schema.hasTable("categories").then((exists) => {
@@ -360,10 +443,8 @@ exports.up = function (knex) {
         t.boolean("auto_approve").defaultTo(false);
         t.boolean("show_fields_as_columns").defaultTo(false);
         t.boolean("assign_discord_roles_on_approval").defaultTo(false);
-        t.boolean("display_applicant_forms_on_discord").defaultTo(false);
-        t.string("approved_applicant_channel_id");
-        t.string("pending_applicant_channel_id");
-        t.string("rejected_applicant_channel_id");
+        t.boolean("link_to_discord").defaultTo(false);
+        t.string("applicant_form_channel_id");
         t.integer("creator_id")
           .references("users.id")
           .onDelete("CASCADE")
@@ -380,7 +461,8 @@ exports.up = function (knex) {
         t.integer("form_id")
           .references("id")
           .inTable("forms")
-          .onDelete("CASCADE");
+          .onDelete("CASCADE")
+          .onUpdate("CASCADE");
         t.uuid("roster_id")
           .references("rosters.id")
           .onDelete("CASCADE")
@@ -404,12 +486,9 @@ exports.up = function (knex) {
           .references("users.id")
           .onDelete("CASCADE")
           .onUpdate("CASCADE");
-        t.enum("status", [
-          "pending",
-          "approved",
-          "rejected",
-          "removed",
-        ]).defaultTo("pending");
+        t.enum("status", ["pending", "approved", "rejected"]).defaultTo(
+          "pending"
+        );
         t.boolean("is_deletable").defaultTo(true);
         t.uuid("roster_rank_id").references("roster_ranks.id");
         t.timestamp("approved_on");
@@ -506,7 +585,6 @@ exports.up = function (knex) {
           .onDelete("CASCADE");
         t.string("name");
         t.text("description");
-        // t.boolean("status").defaultTo(false);
         t.boolean("is_deletable").defaultTo(true);
         t.timestamps();
       });
@@ -592,19 +670,7 @@ exports.up = function (knex) {
         t.timestamps();
       });
     }),
-    knex.schema.hasTable("media_share").then((exists) => {
-      if (exists) return;
-      return knex.schema.createTable("media_share", (t) => {
-        t.uuid("media_id")
-          .references("media.id")
-          .onDelete("CASCADE")
-          .onUpdate("CASCADE");
-        t.integer("user_id")
-          .references("users.id")
-          .onDelete("CASCADE")
-          .onUpdate("CASCADE");
-      });
-    }),
+
     // knex.schema.raw(
     //   `CREATE OR REPLACE RULE check_user_role_duplicates AS ON INSERT TO user_roles WHERE EXISTS (SELECT 1 FROM user_roles WHERE user_roles.user_id = NEW.user_id AND WHERE user_roles.role_id = NEW.role_id) DO INSTEAD NOTHING`
     // ),
@@ -619,26 +685,10 @@ exports.down = async function (knex) {
     roster_member_forms, roster_table_columns, user_sessions, user_policies, form_fields, fields, 
     forms, menu_tree, menu, event_participants, 
     event_roles, event_meta, events, categories, 
-    user_roles, role_maps, discord_roles, role_policies, policies, post_types,
-    users, roles, media, posts, testimonies, tags, bot_watched_roles,
+    user_roles, role_maps, discord_reaction_role_assignment, discord_roles, discord_messages, discord_message_drafts, discord_webhooks, discord_watched_roles, discord_applicant_forms, role_policies, policies, post_types,
+    users, roles, media, posts, testimonies, tags, bot_watched_roles, bot_applicant_forms,
     settings, front_page_info`
     ),
     knex.raw(DROP_BEFORE_INSERT),
   ]);
-
-  // try {
-  //   await knex.raw(DROP_BEFORE_INSERT),
-  //   await knex.raw(
-  //     `DROP TABLE IF EXISTS rosters, roster_forms, roster_member_permissions, roster_permissions, roster_members,
-  //     roster_ranks, roster_roles, media_share, user_form_fields,
-  //     user_forms, user_sessions, user_policies, form_fields, fields,
-  //     forms, menu_tree, menu, event_participants,
-  //     event_roles, event_meta, events, categories,
-  //     user_roles, role_maps, discord_roles, role_policies, policies, post_types,
-  //     users, roles, media, posts, testimonies, tags,
-  //     settings, front_page_info`
-  //   );
-  // } catch (err) {
-  //   throw err;
-  // }
 };

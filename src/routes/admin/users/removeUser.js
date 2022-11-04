@@ -28,16 +28,14 @@ const removeUser = async function (req, res, next) {
     if (sessions && sessions.length) {
       await redis.multi(sessions).exec();
     }
-    const pipeline = redis.pipeline();
 
-    req.query.ids.forEach((id) => {
-      pipeline.del(`user:${id}`);
-      pipeline.del(`me:${id}`);
-    });
+    const ids = req.query.ids
+      .map((id) => {
+        return `user:${id}|me:${id}`;
+      })
+      .join("|");
 
-    pipeline.exec();
-
-    deleteCacheByPattern("users:");
+    deleteCacheByPattern(`?(admin:users*|users*|${ids})`);
 
     res.status(200).send(deleted);
   } catch (err) {

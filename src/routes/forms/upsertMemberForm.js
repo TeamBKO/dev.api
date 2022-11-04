@@ -2,7 +2,7 @@
 const RosterForm = require("$models/RosterForm");
 const RosterMember = require("$models/RosterMember");
 const massageMemberData = require("$util/massageMemberData");
-const redis = require("$services/redis");
+const emitter = require("$services/redis/emitter");
 const sanitize = require("sanitize-html");
 const { param, body } = require("express-validator");
 const { validate } = require("$util");
@@ -85,6 +85,7 @@ const upsertMemberForm = async function (req, res, next) {
     try {
       const result = await RosterForm.query(trx).upsertGraph(data, {
         relate: ["form", "form_fields"],
+        unrelate: ["form", "form_fields"],
       });
 
       await trx.commit();
@@ -97,14 +98,22 @@ const upsertMemberForm = async function (req, res, next) {
       const member = massageMemberData(
         await RosterMember.query()
           .joinRelated("member(defaultSelects)")
-          .withGraphFetched("form(default).[fields(useAsColumn)]")
-          .select(["roster_members.id", "member.username"])
+          .withGraphFetched("forms(default).[fields(useAsColumn)]")
+          .select([
+            "roster_members.id",
+            "member.username",
+            "roster_members.status",
+          ])
           .where("roster_members.id", roster_member_id)
           .first()
       );
 
-      await redis.del(`roster:${roster_id}`);
-      deleteCacheByPattern(`members:${roster_id.split("-")[4]}:`);
+      deleteCacheByPattern(`roster:${roster_id}*`);
+
+      emitter
+        .of("/rosters")
+        .to(`roster:${roster_id}`)
+        .emit("update:member", member);
 
       res.status(200).send({ formID: result.id, member });
     } catch (err) {

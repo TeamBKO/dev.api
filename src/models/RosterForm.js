@@ -15,13 +15,11 @@ class RosterForm extends cursor(guid(dateMixin(Model))) {
   }
 
   static get modifiers() {
+    const { ref } = RosterForm;
     return {
-      default: (qb) => qb.select("id"),
-      // useAsColumn: (qb) =>
-      //   qb
-      //     .withGraphJoined("fields")
-      //     .where("fields.use_as_column", true)
-      //     .select(["forms.id"]),
+      default: (qb) => {
+        qb.select(ref("id"), ref("form_id"));
+      },
     };
   }
 
@@ -34,7 +32,6 @@ class RosterForm extends cursor(guid(dateMixin(Model))) {
         form_id: { type: "integer" },
         roster_member_id: { type: "string" },
         roster_id: { type: "string" },
-        // status: { type: "string" },
         created_at: { type: "string" },
         updated_at: { type: "string" },
       },

@@ -5,7 +5,6 @@ const sanitize = require("sanitize-html");
 const { deleteCacheByPattern } = require("$services/redis/helpers");
 const { body } = require("express-validator");
 const { validate } = require("$util");
-const { transaction } = require("objection");
 const { VIEW_ALL_ADMIN, ADD_ALL_TAGS } = require("$util/policies");
 
 const validators = validate([
@@ -31,7 +30,7 @@ const addTag = async function (req, res, next) {
 
     await trx.commit();
 
-    deleteCacheByPattern("tags:");
+    deleteCacheByPattern("tags*");
 
     const tag = await Tag.query().where("id", inserted.id).first();
 

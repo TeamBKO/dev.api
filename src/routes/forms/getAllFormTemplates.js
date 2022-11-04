@@ -49,8 +49,6 @@ const getAllForms = async function (req, res, next) {
     );
   }
 
-  console.log(forms);
-
   res.status(200).send(forms);
 };
 

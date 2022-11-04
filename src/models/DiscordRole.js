@@ -1,4 +1,7 @@
 const { Model } = require("objection");
+
+const guid = require("$util/mixins/guid")();
+
 const cursor = require("objection-cursor")({
   limit: 50,
   pageInfo: {
@@ -6,7 +9,7 @@ const cursor = require("objection-cursor")({
   },
 });
 
-class DiscordRole extends cursor(Model) {
+class DiscordRole extends cursor(guid(Model)) {
   static get tableName() {
     return "discord_roles";
   }
@@ -16,7 +19,7 @@ class DiscordRole extends cursor(Model) {
       type: "object",
       properties: ["name", "discord_role_id"],
       properties: {
-        id: { type: "integer" },
+        id: { type: "string" },
         name: { type: "string" },
         discord_role_id: { type: "string" },
       },

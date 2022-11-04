@@ -32,17 +32,9 @@ const validators = validate([
   body("is_disabled").optional().isBoolean(),
   body("selectedForm").optional().isNumeric().toInt(10),
   body("selectedRoles.*").notEmpty().optional().isNumeric().toInt(10),
-  body("display_applicant_forms_on_discord").optional().isBoolean(),
+  body("link_to_discord").optional().isBoolean(),
   body("assign_discord_roles_on_approval").optional().isBoolean(),
-  body("approved_applicant_channel_id")
-    .optional()
-    .isString()
-    .customSanitizer((v) => sanitize(v)),
-  body("pending_applicant_channel_id")
-    .optional()
-    .isString()
-    .customSanitizer((v) => sanitize(v)),
-  body("rejected_applicant_channel_id")
+  body("applicant_form_channel_id")
     .optional()
     .isString()
     .customSanitizer((v) => sanitize(v)),
@@ -174,9 +166,8 @@ const generateGraph = (userId, body) => {
     "private",
     "is_disabled",
     "assign_discord_roles_on_approval",
-    "display_applicant_forms_on_discord",
-    "display_applicant_forms_on_discord",
-    "approved_applicant_channel_id",
+    "link_to_discord",
+    "applicant_form_channel_id",
     "pending_applicant_channel_id",
     "rejected_applicant_channel_id",
   ];
@@ -231,9 +222,7 @@ const addRoster = async function (req, res, next) {
       allowRefs: true,
     });
 
-    // await redis.del("rosters:");
-    deleteCacheByPattern("rosters:");
-
+    deleteCacheByPattern(`?(admin:rosters:*|rosters:*)`);
     await trx.commit();
 
     const roster = await Roster.query()

@@ -1,7 +1,7 @@
 "use strict";
 const Testimony = require("$models/Testimony");
-const sanitize = require("sanitize-html");
 const guard = require("express-jwt-permissions")();
+const { deleteCacheByPattern } = require("$services/redis/helpers");
 const { query } = require("express-validator");
 const { validate } = require("$util");
 const {
@@ -25,6 +25,8 @@ const removeTestimony = async function (req, res) {
     .whereIn(req.query.ids)
     .returning("id")
     .delete();
+
+  deleteCacheByPattern("?(admin:testimonies*|testimonies*)");
   res.status(200).send({ deleted });
 };
 
